@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D-Stadtquartier | Mikroklima-Simulator Schweiz</title>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="theme.js"></script>
+<style>
+    :root {
+        --primary: #2c3e50;
+        --accent: #2ecc71;
+        --bg: #f8f9fa;
+        --card-bg: #ffffff;
+        --text: #2c3e50;
+        --muted: #64748b;
+        --tooltip-bg: #2c3e50;
+    }
+
+    :root[data-theme="dark"] {
+        --primary: #e2e8f0;
+        --bg: #0f172a;
+        --card-bg: #1e293b;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --tooltip-bg: #0f172a;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .container { max-width: 1150px; width: 100%; }
+
+    header { text-align: center; margin-bottom: 18px; }
+    header h1 { margin: 0 0 4px 0; font-size: 1.8rem; color: var(--primary); }
+    header p { margin: 0; color: var(--muted); }
+
+    .card {
+        background: var(--card-bg);
+        border-radius: 14px;
+        padding: 20px 22px;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+    }
+
+    .card h2 {
+        font-size: 1.05rem;
+        margin: 0 0 14px 0;
+        color: var(--primary);
+        border-bottom: 2px solid var(--accent);
+        padding-bottom: 8px;
+    }
+
+    /* --- Regler --- */
+    .composition-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 14px 20px;
+    }
+    .control-group { position: relative; }
+    .control-group label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 4px; }
+    .slider-val { float: right; color: #16a34a; font-weight: bold; }
+    input[type="range"] { width: 100%; }
+    select {
+        width: 100%;
+        padding: 7px 8px;
+        border-radius: 6px;
+        border: 1px solid #cbd5e1;
+        font-size: 0.85rem;
+        background: #fff;
+        color: var(--text);
+    }
+    :root[data-theme="dark"] select { background: #334155; color: #e2e8f0; border-color: #475569; }
+
+    .preset-desc { font-size: 0.78rem; color: var(--muted); font-style: italic; margin: 6px 0 0 0; min-height: 1.4em; }
+
+    /* --- Tooltip --- */
+    .has-tooltip { position: relative; display: inline-block; }
+    .tooltip-icon {
+        display: inline-block; width: 15px; height: 15px; background: #94a3b8; color: #fff;
+        border-radius: 50%; text-align: center; font-size: 10px; line-height: 15px; cursor: help;
+        margin-left: 5px; font-weight: bold;
+    }
+    .tooltip-icon:hover { background: var(--tooltip-bg); }
+    .tooltip-text {
+        visibility: hidden; opacity: 0; width: 240px; background: var(--tooltip-bg); color: #fff;
+        text-align: left; border-radius: 6px; padding: 9px 11px; position: absolute; z-index: 30;
+        bottom: 125%; left: 50%; transform: translateX(-50%); transition: opacity 0.25s;
+        font-size: 0.78rem; font-weight: normal; line-height: 1.35; box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    }
+    .has-tooltip:hover .tooltip-text { visibility: visible; opacity: 1; }
+
+    /* --- 3D-Szene --- */
+    #sceneWrap {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16 / 10;
+        min-height: 420px;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #cfe8fa;
+        cursor: grab;
+    }
+    #sceneWrap:active { cursor: grabbing; }
+    :root[data-theme="dark"] #sceneWrap { background: #0b1220; }
+    #cityCanvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+
+    .hud-badge {
+        position: absolute;
+        top: 14px;
+        left: 14px;
+        background: rgba(15, 23, 42, 0.78);
+        color: #fff;
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-size: 0.82rem;
+        line-height: 1.5;
+        pointer-events: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+    .hud-badge strong { color: #fbbf24; }
+
+    .scene-hint {
+        position: absolute;
+        bottom: 10px;
+        right: 14px;
+        color: rgba(15, 23, 42, 0.55);
+        font-size: 0.72rem;
+        pointer-events: none;
+    }
+    :root[data-theme="dark"] .scene-hint { color: rgba(226,232,240,0.55); }
+
+    .data-pin {
+        position: absolute;
+        transform: translate(-50%, -100%);
+        background: #fff;
+        color: #1e293b;
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        line-height: 1.4;
+        white-space: nowrap;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+        pointer-events: none;
+        transition: opacity 0.15s;
+    }
+    .data-pin::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 100%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-top-color: #fff;
+    }
+    .data-pin.pin-asphalt { border-left: 4px solid #e67e22; }
+    .data-pin.pin-trees { border-left: 4px solid #2ecc71; }
+    .data-pin.pin-roofs { border-left: 4px solid #3498db; }
+
+    /* --- Seitennavigation --- */
+    .page-nav {
+        max-width: 1150px;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        margin: 0 0 18px 0;
+    }
+    .page-nav a {
+        text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 20px;
+        transition: background 0.2s, color 0.2s;
+    }
+    .page-nav a.active { background: var(--primary); color: #fff; }
+    .page-nav a:not(.active) { background: #eaeded; color: var(--primary); }
+    .page-nav a:not(.active):hover { background: #dfe3e4; }
+    :root[data-theme="dark"] .page-nav a:not(.active) { background: #1e293b; color: #e2e8f0; }
+    :root[data-theme="dark"] .page-nav a:not(.active):hover { background: #334155; }
+
+    /* --- Dark-Mode-Switch --- */
+    .theme-switch { position: relative; display: inline-block; width: 46px; height: 24px; margin-left: auto; flex-shrink: 0; }
+    .theme-switch input { opacity: 0; width: 0; height: 0; }
+    .theme-switch-slider { position: absolute; inset: 0; background: #cbd5e1; border-radius: 999px; cursor: pointer; transition: background 0.25s; }
+    .theme-switch-slider::before {
+        content: '☀️'; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; border-radius: 50%;
+        background: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; transition: transform 0.25s;
+    }
+    .theme-switch input:checked + .theme-switch-slider { background: #334155; }
+    .theme-switch input:checked + .theme-switch-slider::before { content: '🌙'; transform: translateX(22px); }
+
+    footer { text-align: center; font-size: 0.78rem; color: var(--muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<nav class="page-nav">
+    <a href="index.html">🏙️ Simulator</a>
+    <a href="day-cycle.html">🕐 Tagesverlauf &amp; Duell-Modus</a>
+    <a href="3d-city.html" class="active">🧊 3D-Stadtquartier</a>
+    <a href="kurzinfo.html">📊 Kurzinfo</a>
+    <label class="theme-switch" title="Dark Mode umschalten">
+        <input type="checkbox" id="themeToggle">
+        <span class="theme-switch-slider"></span>
+    </label>
+</nav>
+
+<div class="container">
+    <header>
+        <h1>🇨🇭 3D-Stadtquartier (Isometrisch)</h1>
+        <p>Interaktives 100&nbsp;m &times; 100&nbsp;m Stadtquartier &ndash; Gebäude, Bäume und Beläge in Echtzeit-3D</p>
+    </header>
+
+    <div class="card">
+        <h2>Flächenzusammensetzung &amp; Rahmenbedingungen</h2>
+        <div class="control-group" style="margin-bottom: 16px;">
+            <label>Schweizer Gemeinde-Preset</label>
+            <select id="cityPreset3d"></select>
+            <p class="preset-desc" id="presetDesc3d"></p>
+        </div>
+        <div class="composition-grid">
+            <div class="control-group">
+                <label>Asphalt: <span class="slider-val" id="valAsphalt">30%</span></label>
+                <input type="range" id="pctAsphalt" min="0" max="100" value="30">
+            </div>
+            <div class="control-group">
+                <label>Poröser Belag: <span class="slider-val" id="valPorous">10%</span></label>
+                <input type="range" id="pctPorous" min="0" max="100" value="10">
+            </div>
+            <div class="control-group">
+                <label>Gebäude: <span class="slider-val" id="valBuildings">25%</span></label>
+                <input type="range" id="pctBuildings" min="0" max="100" value="25">
+            </div>
+            <div class="control-group">
+                <label>Grünfläche: <span class="slider-val" id="valGreen">20%</span></label>
+                <input type="range" id="pctGreen" min="0" max="100" value="20">
+            </div>
+            <div class="control-group">
+                <label>Bäume: <span class="slider-val" id="valTrees">15%</span></label>
+                <input type="range" id="pctTrees" min="0" max="100" value="15">
+            </div>
+            <div class="control-group">
+                <label>Dachbegrünung: <span class="slider-val" id="valGreenRoofs">50%</span></label>
+                <input type="range" id="pctGreenRoofs" min="0" max="100" value="50">
+            </div>
+            <div class="control-group">
+                <label>Referenztemp. (Umland): <span class="slider-val" id="valTRef">25°C</span></label>
+                <input type="range" id="tRef" min="15" max="35" step="0.5" value="25">
+            </div>
+            <div class="control-group">
+                <label>Hitzeinsel-Faktor (max.): <span class="slider-val" id="valUHIMax">5°C</span></label>
+                <input type="range" id="uhiMax" min="1" max="10" step="0.5" value="5">
+            </div>
+            <div class="control-group">
+                <label>
+                    Asphalt-Albedo
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Rückstrahlvermögen des Belags. Dunkler Asphalt (0.08) schluckt fast alles Licht, helle Spezialbeläge (0.35) reflektieren deutlich mehr.</span>
+                    </span>
+                </label>
+                <select id="asphaltAlbedo" style="margin-top:5px;">
+                    <option value="0.08">Dunkler Asphalt (0.08)</option>
+                    <option value="0.12" selected>Standard-Asphalt (0.12)</option>
+                    <option value="0.2">Grauer Belag (0.20)</option>
+                    <option value="0.35">Cool Pavement (0.35)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>
+            3D-Ansicht
+            <span class="has-tooltip">
+                <span class="tooltip-icon">i</span>
+                <span class="tooltip-text">Mit der Maus drehen (ziehen) und zoomen (Scrollrad). Die Szene aktualisiert sich sofort bei jeder Reglerbewegung.</span>
+            </span>
+        </h2>
+        <div id="sceneWrap">
+            <canvas id="cityCanvas"></canvas>
+            <div class="hud-badge" id="hudBadge">
+                Gefühlte Lufttemperatur: <strong id="hudAirTemp">-- °C</strong><br>
+                InVEST Kühlleistung: <strong id="hudCC">-- %</strong>
+            </div>
+            <div class="data-pin pin-asphalt" id="pinAsphalt" style="display:none;"></div>
+            <div class="data-pin pin-trees" id="pinTrees" style="display:none;"></div>
+            <div class="data-pin pin-roofs" id="pinRoofs" style="display:none;"></div>
+            <div class="scene-hint">Ziehen zum Drehen &middot; Scrollen zum Zoomen</div>
+        </div>
+    </div>
+
+    <footer>Basierend auf dem InVEST Urban Cooling Model &middot; Kalibriert mit BAFU- und ETHZ-Daten</footer>
+</div>
+
+<script src="microclimate-engine-v2.js"></script>
+<script>
+(function () {
+    'use strict';
+
+    // ---------------------------------------------------------------
+    // Schweizer Gemeinde- und Archetyp-Presets (100% deckungsgleich mit
+    // dem Duell-Modus in day-cycle.html)
+    // ---------------------------------------------------------------
+    const PLACE_PRESETS = {
+        dense_city: {
+            category: 'Archetypen', name: 'Dicht bebaute Grossstadt',
+            description: 'Hoher Versiegelungsgrad, kaum Verschattung – klassische Betonwüste.',
+            pctAsphalt: 45, pctPorous: 5, pctBuildings: 35, pctGreen: 8, pctTrees: 7,
+            pctGreenRoofs: 10, asphaltAlbedo: 0.08, tRef: 25, uhiMax: 6.5
+        },
+        normal_city: {
+            category: 'Archetypen', name: 'Durchschnittliche Stadt',
+            description: 'Typische mitteleuropäische Stadtstruktur mit moderater Durchgrünung.',
+            pctAsphalt: 32, pctPorous: 10, pctBuildings: 25, pctGreen: 20, pctTrees: 13,
+            pctGreenRoofs: 20, asphaltAlbedo: 0.12, tRef: 25, uhiMax: 5.0
+        },
+        urban_land: {
+            category: 'Archetypen', name: 'Siedlungsgebiet (Wohnquartier)',
+            description: 'Lockere Wohnbebauung mit Gärten – deutlich weniger dicht als die Kernstadt.',
+            pctAsphalt: 20, pctPorous: 12, pctBuildings: 20, pctGreen: 30, pctTrees: 18,
+            pctGreenRoofs: 15, asphaltAlbedo: 0.12, tRef: 25, uhiMax: 3.5
+        },
+        banlieue: {
+            category: 'Archetypen', name: 'Banlieue / Trabantenstadt',
+            description: 'Dichte Blockrandbebauung am Stadtrand, wenig Grünraum zwischen den Hochhäusern.',
+            pctAsphalt: 38, pctPorous: 7, pctBuildings: 33, pctGreen: 14, pctTrees: 8,
+            pctGreenRoofs: 8, asphaltAlbedo: 0.08, tRef: 25, uhiMax: 5.8
+        },
+        countryside: {
+            category: 'Archetypen', name: 'Ländliches Gebiet',
+            description: 'Offene Landschaft mit vereinzelter Bebauung, viel Wiese und Feld.',
+            pctAsphalt: 8, pctPorous: 7, pctBuildings: 5, pctGreen: 55, pctTrees: 25,
+            pctGreenRoofs: 5, asphaltAlbedo: 0.20, tRef: 25, uhiMax: 1.2
+        },
+        forest: {
+            category: 'Archetypen', name: 'Wald',
+            description: 'Nahezu vollständige Baumkronenbedeckung – das natürliche Kühlungs-Optimum.',
+            pctAsphalt: 1, pctPorous: 1, pctBuildings: 0, pctGreen: 8, pctTrees: 90,
+            pctGreenRoofs: 0, asphaltAlbedo: 0.12, tRef: 25, uhiMax: 0.5
+        },
+        carouge: {
+            category: 'Schweizer Städte', name: 'Carouge (GE)',
+            description: 'Schweizweit am stärksten versiegelt (79%). Extreme Hitzeinsel.',
+            pctAsphalt: 55, pctPorous: 5, pctBuildings: 24, pctGreen: 11, pctTrees: 5,
+            pctGreenRoofs: 10, asphaltAlbedo: 0.08, tRef: 25, uhiMax: 6.5
+        },
+        emmen: {
+            category: 'Schweizer Städte', name: 'Emmen (LU)',
+            description: 'Spitzenreiter der Versiegelung in der Deutschschweiz (70%).',
+            pctAsphalt: 45, pctPorous: 5, pctBuildings: 20, pctGreen: 20, pctTrees: 10,
+            pctGreenRoofs: 5, asphaltAlbedo: 0.12, tRef: 25, uhiMax: 5.5
+        },
+        zuerich: {
+            category: 'Schweizer Städte', name: 'Zürich (Zentrum)',
+            description: 'Urbane Kernzone mit ca. 15.4% Baumkronenanteil.',
+            pctAsphalt: 40, pctPorous: 10, pctBuildings: 25, pctGreen: 10, pctTrees: 15,
+            pctGreenRoofs: 15, asphaltAlbedo: 0.08, tRef: 25, uhiMax: 6.0
+        },
+        lausanne: {
+            category: 'Schweizer Städte', name: 'Lausanne (VD)',
+            description: 'EPFL-Forschungsgebiet. Starkes Relief, mässige Begrünung.',
+            pctAsphalt: 35, pctPorous: 10, pctBuildings: 20, pctGreen: 15, pctTrees: 20,
+            pctGreenRoofs: 20, asphaltAlbedo: 0.12, tRef: 25, uhiMax: 5.0
+        },
+        riehen: {
+            category: 'Schweizer Städte', name: 'Riehen (BS)',
+            description: 'Grünste Grossgemeinde der Schweiz (nur 46% versiegelt).',
+            pctAsphalt: 25, pctPorous: 15, pctBuildings: 6, pctGreen: 30, pctTrees: 24,
+            pctGreenRoofs: 40, asphaltAlbedo: 0.20, tRef: 25, uhiMax: 3.5
+        },
+        dorf: {
+            category: 'Schweizer Städte', name: 'Mittelland-Dorf (BE)',
+            description: 'Typische ländliche Struktur. Geringe Luftüberwärmung, aber lokale Hitze-Hotspots.',
+            pctAsphalt: 15, pctPorous: 10, pctBuildings: 8, pctGreen: 45, pctTrees: 22,
+            pctGreenRoofs: 5, asphaltAlbedo: 0.12, tRef: 25, uhiMax: 1.5
+        },
+        renens: {
+            category: 'Schweizer Städte', name: 'Renens (VD)',
+            description: 'Zweithöchste Versiegelung der Schweiz (73%). Extrem dichte Bebauung.',
+            pctAsphalt: 50, pctPorous: 8, pctBuildings: 23, pctGreen: 12, pctTrees: 7,
+            pctGreenRoofs: 10, asphaltAlbedo: 0.08, tRef: 25, uhiMax: 6.2
+        },
+        genf: {
+            category: 'Schweizer Städte', name: 'Genf (GE)',
+            description: 'Dicht bebaute Metropole mit 71% Versiegelungsgrad. Starke Hitzeinsel.',
+            pctAsphalt: 46, pctPorous: 10, pctBuildings: 25, pctGreen: 11, pctTrees: 8,
+            pctGreenRoofs: 15, asphaltAlbedo: 0.08, tRef: 25, uhiMax: 6.0
+        },
+        vevey: {
+            category: 'Schweizer Städte', name: 'Vevey (VD)',
+            description: 'Bekannt für extreme Tropennächte (nachts bis zu 24.7°C am Seeufer).',
+            pctAsphalt: 38, pctPorous: 12, pctBuildings: 20, pctGreen: 15, pctTrees: 15,
+            pctGreenRoofs: 20, asphaltAlbedo: 0.12, tRef: 25, uhiMax: 5.8
+        }
+    };
+
+    function populatePresetSelect(select) {
+        const byCategory = {};
+        Object.entries(PLACE_PRESETS).forEach(([key, preset]) => {
+            (byCategory[preset.category] = byCategory[preset.category] || []).push([key, preset]);
+        });
+        const blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = '-- Eigene Konfiguration --';
+        select.appendChild(blank);
+        Object.entries(byCategory).forEach(([category, entries]) => {
+            const group = document.createElement('optgroup');
+            group.label = category;
+            entries.forEach(([key, preset]) => {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = preset.name;
+                group.appendChild(opt);
+            });
+            select.appendChild(group);
+        });
+    }
+
+    // ---------------------------------------------------------------
+    // Deterministische Pseudozufallszahlen (fixer Seed) - sorgt dafür,
+    // dass sich die Stadt beim Verschieben der Regler organisch verändert,
+    // statt bei jedem Recompute komplett neu zu "flackern".
+    // ---------------------------------------------------------------
+    function mulberry32(seed) {
+        return function () {
+            seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+            let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    const GRID_SIZE = 10;               // 10 x 10 Zellen
+    const CELL = 10;                    // 10m pro Zelle -> 100m x 100m Areal
+    const CELL_COUNT = GRID_SIZE * GRID_SIZE;
+
+    // Feste, gemischte Zell-Reihenfolge (Fisher-Yates mit festem Seed)
+    const CELL_ORDER = Array.from({ length: CELL_COUNT }, (_, i) => i);
+    (function shuffle() {
+        const rand = mulberry32(1337);
+        for (let i = CELL_ORDER.length - 1; i > 0; i--) {
+            const j = Math.floor(rand() * (i + 1));
+            [CELL_ORDER[i], CELL_ORDER[j]] = [CELL_ORDER[j], CELL_ORDER[i]];
+        }
+    })();
+
+    // Feste Gebäudehöhen, Baumgrössen & Farbvarianz pro physischer Zelle (unabhängig vom Typ)
+    const HEIGHT_RAND = mulberry32(4242);
+    const CELL_BUILDING_HEIGHT = Array.from({ length: CELL_COUNT }, () => 9 + HEIGHT_RAND() * 27);
+    const TREE_RAND = mulberry32(99);
+    const CELL_TREE_SCALE = Array.from({ length: CELL_COUNT }, () => 0.75 + TREE_RAND() * 0.55);
+    const HUE_RAND = mulberry32(777);
+    const CELL_BUILDING_HUE = Array.from({ length: CELL_COUNT }, () => HUE_RAND());
+    const JITTER_RAND = mulberry32(2024);
+    const CELL_TILE_JITTER = Array.from({ length: CELL_COUNT }, () => (JITTER_RAND() - 0.5) * 0.12);
+    const LOBE_RAND = mulberry32(555);
+    const CELL_LOBE_SEED = Array.from({ length: CELL_COUNT }, () => LOBE_RAND());
+
+    function lerpColor(hexA, hexB, t) {
+        const a = new THREE.Color(hexA), b = new THREE.Color(hexB);
+        return a.clone().lerp(b, Math.max(0, Math.min(1, t)));
+    }
+
+    // Fenstertextur für Gebäudefassaden (einmalig generiert, wiederverwendet)
+    function makeWindowTexture() {
+        const c = document.createElement('canvas');
+        c.width = 64; c.height = 128;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, 64, 128);
+        ctx.fillStyle = 'rgba(30, 41, 59, 0.5)';
+        const cols = 3, rows = 6, padX = 7, padY = 9;
+        const cw = (64 - padX * (cols + 1)) / cols;
+        const rh = (128 - padY * (rows + 1)) / rows;
+        for (let r = 0; r < rows; r++) {
+            for (let col = 0; col < cols; col++) {
+                ctx.fillRect(padX + col * (cw + padX), padY + r * (rh + padY), cw, rh);
+            }
+        }
+        const tex = new THREE.CanvasTexture(c);
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(2, 7);
+        tex.needsUpdate = true;
+        return tex;
+    }
+    const windowTexture = makeWindowTexture();
+
+    // ---------------------------------------------------------------
+    // Three.js Setup
+    // ---------------------------------------------------------------
+    const canvas = document.getElementById('cityCanvas');
+    const sceneWrap = document.getElementById('sceneWrap');
+
+    const scene = new THREE.Scene();
+
+    const VIEW_SIZE = 68;
+    let camera = new THREE.OrthographicCamera(-VIEW_SIZE, VIEW_SIZE, VIEW_SIZE, -VIEW_SIZE, 1, 500);
+    camera.position.set(90, 90, 90);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.1;
+    controls.minZoom = 0.5;
+    controls.maxZoom = 3.5;
+    controls.minPolarAngle = Math.PI * 0.18;
+    controls.maxPolarAngle = Math.PI * 0.47;
+    controls.enablePan = false;
+    controls.target.set(0, 2, 0);
+
+    // Licht
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.55);
+    scene.add(hemi);
+
+    const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+    sun.position.set(60, 90, 40);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -65;
+    sun.shadow.camera.right = 65;
+    sun.shadow.camera.top = 65;
+    sun.shadow.camera.bottom = -65;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 250;
+    sun.shadow.bias = -0.0015;
+    scene.add(sun);
+
+    // Basisplatte unter dem Quartier
+    const baseGeo = new THREE.BoxGeometry(GRID_SIZE * CELL + 4, 1, GRID_SIZE * CELL + 4);
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0xbfc7cf, roughness: 1 });
+    const base = new THREE.Mesh(baseGeo, baseMat);
+    base.position.y = -0.5;
+    base.receiveShadow = true;
+    scene.add(base);
+
+    let cityGroup = new THREE.Group();
+    scene.add(cityGroup);
+
+    function setSceneBackground() {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const bg = isDark ? 0x0b1220 : 0xcfe8fa;
+        scene.background = new THREE.Color(bg);
+        scene.fog = new THREE.Fog(bg, 140, 260);
+        hemi.intensity = isDark ? 0.35 : 0.55;
+        sun.intensity = isDark ? 0.55 : 0.9;
+    }
+    setSceneBackground();
+    document.addEventListener('themechange', setSceneBackground);
+
+    function resizeRenderer() {
+        const w = sceneWrap.clientWidth;
+        const h = sceneWrap.clientHeight;
+        const aspect = w / h;
+        camera.left = -VIEW_SIZE * aspect;
+        camera.right = VIEW_SIZE * aspect;
+        camera.top = VIEW_SIZE;
+        camera.bottom = -VIEW_SIZE;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h, false);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    }
+    window.addEventListener('resize', resizeRenderer);
+
+    // ---------------------------------------------------------------
+    // Wiederverwendbare Geometrien / Materialien
+    // ---------------------------------------------------------------
+    const tileGeo = new THREE.BoxGeometry(CELL - 0.4, 0.3, CELL - 0.4);
+    const trunkGeo = new THREE.CylinderGeometry(0.32, 0.45, 2.4, 8);
+    const lobeGeo = new THREE.IcosahedronGeometry(1, 1); // Blattkugel-Basis für Baumkronen
+    const buildingUnitGeo = new THREE.BoxGeometry(CELL - 3, 1, CELL - 3); // per Mesh auf Zielhöhe skaliert
+    const roofGeo = new THREE.BoxGeometry(CELL - 3.2, 0.5, CELL - 3.2);
+    const roofEdgeGeo = new THREE.BoxGeometry(CELL - 3.2, 0.9, 0.25);
+
+    let currentMaterials = [];
+
+    function buildCityScene(comp, surfaceTemperature, pctGreenRoofs) {
+        // Alte Szene (Meshes + Materialien) entsorgen
+        cityGroup.children.slice().forEach(child => cityGroup.remove(child));
+        currentMaterials.forEach(m => m.dispose());
+        currentMaterials = [];
+
+        // Zellzahlen aus Flächenanteilen ableiten (Summe = CELL_COUNT)
+        const raw = {
+            asphalt: comp.asphalt,
+            porous: comp.porous,
+            buildings: comp.buildings,
+            green: comp.green,
+            trees: comp.trees
+        };
+        const order = ['buildings', 'trees', 'green', 'porous', 'asphalt'];
+        const counts = {};
+        let assigned = 0;
+        order.forEach((key, idx) => {
+            if (idx === order.length - 1) {
+                counts[key] = Math.max(0, CELL_COUNT - assigned);
+            } else {
+                counts[key] = Math.round(raw[key] * CELL_COUNT);
+                assigned += counts[key];
+            }
+        });
+
+        // Zellen anhand der festen Permutation den Typen zuordnen
+        const cellType = new Array(CELL_COUNT).fill('asphalt');
+        let cursor = 0;
+        order.forEach(key => {
+            for (let n = 0; n < counts[key] && cursor < CELL_COUNT; n++) {
+                cellType[CELL_ORDER[cursor]] = key;
+                cursor++;
+            }
+        });
+
+        // Innerhalb der Gebäudezellen: welche bekommen ein Gründach?
+        const buildingCells = CELL_ORDER.filter(i => cellType[i] === 'buildings');
+        const greenRoofCount = Math.round(buildingCells.length * (pctGreenRoofs / 100));
+        const greenRoofSet = new Set(buildingCells.slice(0, greenRoofCount));
+
+        // Heatmap-Farbe der versiegelten Beläge (kühles Grün -> heisses Rot)
+        const heatT = Math.max(0, Math.min(1, surfaceTemperature / 58));
+        const asphaltBase = lerpColor('#2ecc71', '#e74c3c', heatT);
+        const porousBase = lerpColor('#2ecc71', '#e74c3c', heatT * 0.6).lerp(new THREE.Color('#a5b1b2'), 0.35);
+        const greenBase = new THREE.Color(0x27ae60);
+        const roofStdMat = new THREE.MeshStandardMaterial({ color: 0x8b95a1, roughness: 0.85 });
+        const roofGreenMat = new THREE.MeshStandardMaterial({ color: 0x2ecc71, roughness: 1 });
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 1 });
+        const canopyMatA = new THREE.MeshStandardMaterial({ color: 0x2f9e44, roughness: 1 });
+        const canopyMatB = new THREE.MeshStandardMaterial({ color: 0x1e7e34, roughness: 1 });
+        currentMaterials = [roofStdMat, roofGreenMat, trunkMat, canopyMatA, canopyMatB];
+
+        function jitteredMat(baseColor, jitter, roughness) {
+            const c = baseColor.clone().offsetHSL(0, 0, jitter);
+            const mat = new THREE.MeshStandardMaterial({ color: c, roughness: roughness });
+            currentMaterials.push(mat);
+            return mat;
+        }
+
+        const half = (GRID_SIZE * CELL) / 2 - CELL / 2;
+        let anchorAsphalt = null, anchorTrees = null, anchorRoofs = null, anchorRoofsGreen = null;
+
+        for (let row = 0; row < GRID_SIZE; row++) {
+            for (let col = 0; col < GRID_SIZE; col++) {
+                const i = row * GRID_SIZE + col;
+                const x = col * CELL - half;
+                const z = row * CELL - half;
+                const type = cellType[i];
+
+                const jitter = CELL_TILE_JITTER[i];
+
+                if (type === 'asphalt' || type === 'porous') {
+                    const mat = jitteredMat(type === 'asphalt' ? asphaltBase : porousBase, jitter, 0.95);
+                    const tile = new THREE.Mesh(tileGeo, mat);
+                    tile.position.set(x, 0.15, z);
+                    tile.receiveShadow = true;
+                    cityGroup.add(tile);
+                    if (type === 'asphalt' && !anchorAsphalt) {
+                        anchorAsphalt = new THREE.Vector3(x, 0.35, z);
+                    }
+                } else if (type === 'green') {
+                    const mat = jitteredMat(greenBase, jitter, 1);
+                    const tile = new THREE.Mesh(tileGeo, mat);
+                    tile.position.set(x, 0.15, z);
+                    tile.receiveShadow = true;
+                    cityGroup.add(tile);
+                } else if (type === 'trees') {
+                    const groundTile = new THREE.Mesh(tileGeo, jitteredMat(greenBase, jitter, 1));
+                    groundTile.position.set(x, 0.15, z);
+                    groundTile.receiveShadow = true;
+                    cityGroup.add(groundTile);
+
+                    const scale = CELL_TREE_SCALE[i];
+                    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+                    trunk.scale.set(scale, scale, scale);
+                    trunk.position.set(x, 1.2 * scale + 0.3, z);
+                    trunk.castShadow = true;
+                    cityGroup.add(trunk);
+
+                    // Volle, unregelmässige Baumkrone aus mehreren überlappenden Blattkugeln
+                    const lobeSeed = CELL_LOBE_SEED[i];
+                    const canopyCenterY = 3.6 * scale + 0.3;
+                    const lobes = [
+                        { r: 1.7, ox: 0, oy: 0, oz: 0 },
+                        { r: 1.25, ox: 1.1, oy: 0.35, oz: 0.3 },
+                        { r: 1.15, ox: -0.9, oy: 0.15, oz: -0.6 },
+                        { r: 1.05, ox: 0.2, oy: 0.6, oz: 1.0 }
+                    ];
+                    lobes.forEach((lobe, li) => {
+                        const lobeMat = (li + lobeSeed * 10) % 2 < 1 ? canopyMatA : canopyMatB;
+                        const canopy = new THREE.Mesh(lobeGeo, lobeMat);
+                        const r = lobe.r * scale;
+                        canopy.scale.set(r, r, r);
+                        canopy.position.set(x + lobe.ox * scale, canopyCenterY + lobe.oy * scale, z + lobe.oz * scale);
+                        canopy.castShadow = true;
+                        cityGroup.add(canopy);
+                    });
+
+                    if (!anchorTrees) {
+                        anchorTrees = new THREE.Vector3(x, canopyCenterY + 1.8 * scale, z);
+                    }
+                } else if (type === 'buildings') {
+                    const padMat = jitteredMat(new THREE.Color(0x9aa0a6), jitter, 0.9);
+                    const pad = new THREE.Mesh(tileGeo, padMat);
+                    pad.position.set(x, 0.15, z);
+                    pad.receiveShadow = true;
+                    cityGroup.add(pad);
+
+                    const height = CELL_BUILDING_HEIGHT[i];
+                    const hue = 0.58 + (CELL_BUILDING_HUE[i] - 0.5) * 0.08;
+                    const lightness = 0.52 + (CELL_BUILDING_HUE[i] - 0.5) * 0.14;
+                    const wallColor = new THREE.Color().setHSL(hue, 0.08, lightness);
+                    const wallMat = new THREE.MeshStandardMaterial({ color: wallColor, map: windowTexture, roughness: 0.75, metalness: 0.05 });
+                    currentMaterials.push(wallMat);
+
+                    const building = new THREE.Mesh(buildingUnitGeo, wallMat);
+                    building.scale.y = height;
+                    building.position.set(x, height / 2 + 0.3, z);
+                    building.castShadow = true;
+                    building.receiveShadow = true;
+                    cityGroup.add(building);
+
+                    const isGreenRoof = greenRoofSet.has(i);
+                    const roofMat = isGreenRoof ? roofGreenMat : roofStdMat;
+                    const roof = new THREE.Mesh(roofGeo, roofMat);
+                    roof.position.set(x, height + 0.55, z);
+                    roof.castShadow = true;
+                    roof.receiveShadow = true;
+                    cityGroup.add(roof);
+
+                    // Attika-Kante rundum für einen "gebauten" statt flachen Look
+                    const parapetMat = roofMat;
+                    for (let side = 0; side < 4; side++) {
+                        const edge = new THREE.Mesh(roofEdgeGeo, parapetMat);
+                        edge.castShadow = true;
+                        const offset = (CELL - 3.2) / 2;
+                        if (side === 0) edge.position.set(x, height + 0.75, z - offset);
+                        else if (side === 1) edge.position.set(x, height + 0.75, z + offset);
+                        else if (side === 2) { edge.rotation.y = Math.PI / 2; edge.position.set(x - offset, height + 0.75, z); }
+                        else { edge.rotation.y = Math.PI / 2; edge.position.set(x + offset, height + 0.75, z); }
+                        cityGroup.add(edge);
+                    }
+
+                    if (!anchorRoofs) {
+                        anchorRoofs = new THREE.Vector3(x, height + 1, z);
+                    }
+                    if (isGreenRoof && !anchorRoofsGreen) {
+                        anchorRoofsGreen = new THREE.Vector3(x, height + 1, z);
+                    }
+                }
+            }
+        }
+
+        return { anchorAsphalt, anchorTrees, anchorRoofs: anchorRoofsGreen || anchorRoofs };
+    }
+
+    // ---------------------------------------------------------------
+    // Pins & HUD
+    // ---------------------------------------------------------------
+    let anchors = {};
+
+    function worldToScreen(vec3) {
+        const v = vec3.clone().project(camera);
+        const w = sceneWrap.clientWidth, h = sceneWrap.clientHeight;
+        return {
+            x: (v.x * 0.5 + 0.5) * w,
+            y: (-v.y * 0.5 + 0.5) * h,
+            visible: v.z < 1
+        };
+    }
+
+    function updatePin(el, anchor) {
+        if (!anchor) { el.style.display = 'none'; return; }
+        const p = worldToScreen(anchor);
+        if (!p.visible || p.x < -50 || p.x > sceneWrap.clientWidth + 50) {
+            el.style.display = 'none';
+            return;
+        }
+        el.style.display = 'block';
+        el.style.left = p.x + 'px';
+        el.style.top = p.y + 'px';
+    }
+
+    // ---------------------------------------------------------------
+    // Simulation & Regler
+    // ---------------------------------------------------------------
+    const sliderIds = ['pctAsphalt', 'pctPorous', 'pctBuildings', 'pctGreen', 'pctTrees', 'pctGreenRoofs', 'tRef', 'uhiMax', 'asphaltAlbedo'];
+
+    function readInputs() {
+        const get = id => parseFloat(document.getElementById(id).value);
+        return {
+            pctAsphalt: get('pctAsphalt'), pctPorous: get('pctPorous'), pctBuildings: get('pctBuildings'),
+            pctGreen: get('pctGreen'), pctTrees: get('pctTrees'), pctGreenRoofs: get('pctGreenRoofs'),
+            asphaltAlbedo: get('asphaltAlbedo'), tRef: get('tRef'), uhiMax: get('uhiMax')
+        };
+    }
+
+    function updateSimulation() {
+        const inputs = readInputs();
+
+        document.getElementById('valAsphalt').innerText = inputs.pctAsphalt + '%';
+        document.getElementById('valPorous').innerText = inputs.pctPorous + '%';
+        document.getElementById('valBuildings').innerText = inputs.pctBuildings + '%';
+        document.getElementById('valGreen').innerText = inputs.pctGreen + '%';
+        document.getElementById('valTrees').innerText = inputs.pctTrees + '%';
+        document.getElementById('valGreenRoofs').innerText = inputs.pctGreenRoofs + '%';
+        document.getElementById('valTRef').innerText = inputs.tRef.toFixed(1) + '°C';
+        document.getElementById('valUHIMax').innerText = inputs.uhiMax.toFixed(1) + '°C';
+
+        const engine = new MicroclimateEngine({ t_ref: inputs.tRef, uhi_max: inputs.uhiMax });
+        const results = engine.simulate(inputs);
+
+        document.getElementById('hudAirTemp').innerText = results.metrics.airTemperature.toFixed(1) + ' °C';
+        document.getElementById('hudCC').innerText = (results.metrics.coolingCapacity * 100).toFixed(1) + ' %';
+
+        anchors = buildCityScene(results.composition, results.metrics.surfaceTemperature, inputs.pctGreenRoofs);
+
+        const asphaltPin = document.getElementById('pinAsphalt');
+        asphaltPin.innerHTML = 'Oberfläche: ' + results.metrics.surfaceTemperature.toFixed(1) + ' °C<br>Albedo: ' + inputs.asphaltAlbedo.toFixed(2);
+
+        const treesPin = document.getElementById('pinTrees');
+        treesPin.innerHTML = 'Schattenkühlung: -20 °C';
+
+        const roofsPin = document.getElementById('pinRoofs');
+        roofsPin.innerHTML = 'Dachbegrünung: ' + inputs.pctGreenRoofs + ' %';
+    }
+
+    sliderIds.forEach(id => {
+        document.getElementById(id).addEventListener('input', updateSimulation);
+        document.getElementById(id).addEventListener('change', updateSimulation);
+    });
+
+    const presetSelect = document.getElementById('cityPreset3d');
+    populatePresetSelect(presetSelect);
+    presetSelect.addEventListener('change', e => {
+        const key = e.target.value;
+        const descEl = document.getElementById('presetDesc3d');
+        const preset = PLACE_PRESETS[key];
+        if (!preset) { descEl.innerText = ''; return; }
+        descEl.innerText = preset.description;
+        document.getElementById('pctAsphalt').value = preset.pctAsphalt;
+        document.getElementById('pctPorous').value = preset.pctPorous;
+        document.getElementById('pctBuildings').value = preset.pctBuildings;
+        document.getElementById('pctGreen').value = preset.pctGreen;
+        document.getElementById('pctTrees').value = preset.pctTrees;
+        document.getElementById('pctGreenRoofs').value = preset.pctGreenRoofs;
+        document.getElementById('asphaltAlbedo').value = preset.asphaltAlbedo;
+        document.getElementById('tRef').value = preset.tRef;
+        document.getElementById('uhiMax').value = preset.uhiMax;
+        updateSimulation();
+    });
+
+    // ---------------------------------------------------------------
+    // Render-Loop
+    // ---------------------------------------------------------------
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        updatePin(document.getElementById('pinAsphalt'), anchors.anchorAsphalt);
+        updatePin(document.getElementById('pinTrees'), anchors.anchorTrees);
+        updatePin(document.getElementById('pinRoofs'), anchors.anchorRoofs);
+        renderer.render(scene, camera);
+    }
+
+    window.addEventListener('load', () => {
+        resizeRenderer();
+        updateSimulation();
+        animate();
+    });
+})();
+</script>
+</body>
+</html>
