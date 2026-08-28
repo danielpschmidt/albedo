@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kurzinfo | Mikroklima-Simulator Schweiz</title>
+<style>
+    :root {
+        --primary: #2c3e50;
+        --accent: #2ecc71;
+        --bg: #f8f9fa;
+        --card-bg: #ffffff;
+        --text: #2c3e50;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .container {
+        max-width: 1100px;
+        width: 100%;
+    }
+
+    /* --- Seitennavigation --- */
+    .page-nav {
+        max-width: 1100px;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin: 0 0 16px 0;
+    }
+    .page-nav a {
+        text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 20px;
+        transition: background 0.2s, color 0.2s;
+    }
+    .page-nav a.active {
+        background: var(--primary);
+        color: #fff;
+    }
+    .page-nav a:not(.active) {
+        background: #eaeded;
+        color: var(--primary);
+    }
+    .page-nav a:not(.active):hover {
+        background: #dfe3e4;
+    }
+
+    .card {
+        background: var(--card-bg);
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    }
+
+    h1 {
+        text-align: center;
+        color: var(--primary);
+        margin: 0 0 5px 0;
+    }
+
+    .subtitle {
+        text-align: center;
+        color: #7f8c8d;
+        margin: 0 0 24px 0;
+    }
+
+    .infographic-wrap {
+        display: flex;
+        justify-content: center;
+    }
+
+    .infographic-wrap img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.12);
+    }
+
+    .source-note {
+        text-align: center;
+        font-size: 0.78rem;
+        color: #7f8c8d;
+        margin-top: 16px;
+        font-style: italic;
+    }
+</style>
+</head>
+<body>
+
+<nav class="page-nav">
+    <a href="index.html">🏙️ Simulator</a>
+    <a href="day-cycle.html">🕐 Tagesverlauf &amp; Duell-Modus</a>
+    <a href="kurzinfo.html" class="active">📊 Kurzinfo</a>
+</nav>
+
+<div class="container">
+    <h1>Hitzeinsel Schweiz: Kurzinfo 🇨🇭</h1>
+    <p class="subtitle">Warum Schweizer Städte glühen &ndash; und wie wir sie kühlen können</p>
+
+    <div class="card">
+        <div class="infographic-wrap">
+            <img src="public/Hitzeinsel-Effekt_in_Schweizer_Städten.png" alt="Infografik: Hitzeinsel-Effekt in Schweizer Städten &ndash; Ursachen, Messwerte und Kühlstrategien">
+        </div>
+        <p class="source-note">Zusammenfassung der wichtigsten Kennzahlen zum städtischen Hitzeinsel-Effekt, die auch dem Simulator zugrunde liegen (InVEST Urban Cooling Model, BAFU/ETHZ-Daten).</p>
+    </div>
+</div>
+
+</body>
+</html>
