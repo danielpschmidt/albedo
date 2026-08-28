@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tagesverlauf-Dashboard | Mikroklima-Simulator Schweiz</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+    :root {
+        --card-bg: rgba(255,255,255,0.92);
+        --text: #1e293b;
+        --muted: #64748b;
+        --accent: #2ecc71;
+        --tooltip-bg: #1e293b;
+        --bg-a: #0f172a;
+        --bg-b: #1e1b4b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 20px;
+        min-height: 100vh;
+        color: var(--text);
+        background: linear-gradient(160deg, var(--bg-a), var(--bg-b));
+        transition: background 1.2s ease;
+        display: flex;
+        justify-content: center;
+    }
+
+    .container {
+        max-width: 1150px;
+        width: 100%;
+    }
+
+    header {
+        text-align: center;
+        margin-bottom: 22px;
+        color: #fff;
+        text-shadow: 0 2px 8px rgba(0,0,0,0.35);
+    }
+
+    header h1 { margin: 0 0 4px 0; font-size: 1.8rem; }
+    header p { margin: 0; opacity: 0.9; }
+
+    .card {
+        background: var(--card-bg);
+        backdrop-filter: blur(6px);
+        border-radius: 14px;
+        padding: 20px 22px;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    }
+
+    .card h2 {
+        font-size: 1.05rem;
+        margin: 0 0 14px 0;
+        color: var(--text);
+        border-bottom: 2px solid var(--accent);
+        padding-bottom: 8px;
+    }
+
+    /* --- Zusammensetzungs-Regler --- */
+    .composition-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 14px 20px;
+    }
+
+    .control-group { position: relative; }
+
+    .control-group label {
+        display: block;
+        font-weight: 600;
+        font-size: 0.85rem;
+        margin-bottom: 4px;
+    }
+
+    .slider-val { float: right; color: #16a34a; font-weight: bold; }
+
+    input[type="range"] { width: 100%; }
+
+    /* --- Tooltip --- */
+    .has-tooltip { position: relative; display: inline-block; }
+    .tooltip-icon {
+        display: inline-block;
+        width: 15px; height: 15px;
+        background: #94a3b8;
+        color: #fff;
+        border-radius: 50%;
+        text-align: center;
+        font-size: 10px;
+        line-height: 15px;
+        cursor: help;
+        margin-left: 5px;
+        font-weight: bold;
+    }
+    .tooltip-icon:hover { background: var(--tooltip-bg); }
+    .tooltip-text {
+        visibility: hidden;
+        opacity: 0;
+        width: 240px;
+        background: var(--tooltip-bg);
+        color: #fff;
+        text-align: left;
+        border-radius: 6px;
+        padding: 9px 11px;
+        position: absolute;
+        z-index: 20;
+        bottom: 125%;
+        left: 50%;
+        transform: translateX(-50%);
+        transition: opacity 0.25s;
+        font-size: 0.78rem;
+        font-weight: normal;
+        line-height: 1.35;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    }
+    .has-tooltip:hover .tooltip-text { visibility: visible; opacity: 1; }
+
+    /* --- Zeitleiste --- */
+    .timeline-controls {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+
+    #playBtn {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 18px;
+        font-weight: bold;
+        cursor: pointer;
+        font-size: 0.95rem;
+        transition: background 0.2s;
+        flex-shrink: 0;
+    }
+    #playBtn:hover { background: #27ae60; }
+
+    #hourSlider { flex: 1; min-width: 200px; }
+
+    #hourLabel {
+        font-weight: bold;
+        font-size: 1.1rem;
+        min-width: 62px;
+        text-align: center;
+        background: #f1f5f9;
+        border-radius: 8px;
+        padding: 6px 10px;
+    }
+
+    .chart-wrap { position: relative; height: 340px; }
+
+    /* --- Metrik-Karten --- */
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 14px;
+    }
+
+    .metric-card {
+        background: #f8f9fa;
+        border-left: 4px solid var(--accent);
+        padding: 14px 16px;
+        border-radius: 0 10px 10px 0;
+    }
+
+    .metric-title {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+    }
+
+    .metric-value {
+        font-size: 1.6rem;
+        font-weight: bold;
+        color: var(--text);
+        margin-top: 4px;
+    }
+
+    footer { text-align: center; color: rgba(255,255,255,0.75); font-size: 0.78rem; margin-top: 6px; }
+
+    /* --- Seitennavigation --- */
+    .page-nav {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin: 0 0 18px 0;
+    }
+    .page-nav a {
+        text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 20px;
+        transition: background 0.2s, color 0.2s;
+    }
+    .page-nav a.active {
+        background: #fff;
+        color: var(--text);
+    }
+    .page-nav a:not(.active) {
+        background: rgba(255,255,255,0.15);
+        color: #fff;
+    }
+    .page-nav a:not(.active):hover {
+        background: rgba(255,255,255,0.28);
+    }
+
+    /* --- Duell-Modus --- */
+    .duel-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+    @media (max-width: 800px) {
+        .duel-grid { grid-template-columns: 1fr; }
+    }
+
+    .duel-panel {
+        border-radius: 10px;
+        padding: 16px 18px;
+        border-left: 4px solid #94a3b8;
+        background: #fafafa;
+    }
+    .duel-panel.duel-a { border-left-color: #2563eb; background: #eff6ff; }
+    .duel-panel.duel-b { border-left-color: #ea580c; background: #fff7ed; }
+
+    .duel-panel h3 { margin: 0 0 10px 0; font-size: 1rem; }
+
+    .duel-panel select {
+        width: 100%;
+        padding: 7px 8px;
+        border-radius: 6px;
+        border: 1px solid #cbd5e1;
+        font-size: 0.85rem;
+        background: #fff;
+    }
+
+    .duel-preset-desc {
+        font-size: 0.75rem;
+        color: var(--muted);
+        font-style: italic;
+        margin: 6px 0 12px 0;
+        min-height: 1.4em;
+    }
+
+    .duel-mini-grid {
+        grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+        gap: 10px 14px;
+    }
+    .duel-mini-grid label { font-size: 0.74rem; }
+    .duel-mini-grid .slider-val { font-size: 0.74rem; }
+
+    .duel-results-grid {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 16px;
+        align-items: stretch;
+        margin-top: 18px;
+    }
+    @media (max-width: 800px) {
+        .duel-results-grid { grid-template-columns: 1fr; }
+    }
+
+    .duel-result-col {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 14px 16px;
+    }
+    .duel-result-col.col-a { border-top: 3px solid #2563eb; }
+    .duel-result-col.col-b { border-top: 3px solid #ea580c; }
+
+    .duel-result-col h4 {
+        margin: 0 0 8px 0;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        color: var(--muted);
+    }
+
+    .mini-metric {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 5px 0;
+        font-size: 0.9rem;
+        border-bottom: 1px dashed #e2e8f0;
+    }
+    .mini-metric:last-child { border-bottom: none; }
+    .mini-metric strong { color: var(--text); }
+
+    .duel-winner-badge {
+        background: #1e293b;
+        color: #fff;
+        border-radius: 12px;
+        padding: 16px 18px;
+        text-align: center;
+        min-width: 150px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 4px;
+        transition: background 0.3s;
+    }
+    .duel-winner-badge .w-title { font-size: 0.78rem; opacity: 0.85; }
+    .duel-winner-badge .w-value { font-size: 1.15rem; font-weight: bold; }
+</style>
+</head>
+<body id="body">
+
+<div class="container">
+    <nav class="page-nav">
+        <a href="index.html">🏙️ Simulator</a>
+        <a href="day-cycle.html" class="active">🕐 Tagesverlauf &amp; Duell-Modus</a>
+    </nav>
+
+    <header>
+        <h1>🇨🇭 Tagesverlauf-Dashboard</h1>
+        <p>24-Stunden-Simulation der städtischen Hitzeinsel &ndash; von Sonnenaufgang bis zur Tropennacht</p>
+    </header>
+
+    <!-- FLÄCHENZUSAMMENSETZUNG -->
+    <div class="card">
+        <h2>Flächenzusammensetzung &amp; Rahmenbedingungen</h2>
+        <div class="composition-grid">
+            <div class="control-group">
+                <label>Asphalt: <span class="slider-val" id="valAsphalt">30%</span></label>
+                <input type="range" id="pctAsphalt" min="0" max="100" value="30">
+            </div>
+            <div class="control-group">
+                <label>Poröser Belag: <span class="slider-val" id="valPorous">10%</span></label>
+                <input type="range" id="pctPorous" min="0" max="100" value="10">
+            </div>
+            <div class="control-group">
+                <label>Gebäude: <span class="slider-val" id="valBuildings">25%</span></label>
+                <input type="range" id="pctBuildings" min="0" max="100" value="25">
+            </div>
+            <div class="control-group">
+                <label>Grünfläche: <span class="slider-val" id="valGreen">20%</span></label>
+                <input type="range" id="pctGreen" min="0" max="100" value="20">
+            </div>
+            <div class="control-group">
+                <label>Bäume: <span class="slider-val" id="valTrees">15%</span></label>
+                <input type="range" id="pctTrees" min="0" max="100" value="15">
+            </div>
+            <div class="control-group">
+                <label>Dachbegrünung: <span class="slider-val" id="valGreenRoofs">50%</span></label>
+                <input type="range" id="pctGreenRoofs" min="0" max="100" value="50">
+            </div>
+            <div class="control-group">
+                <label>Referenztemp. (Umland): <span class="slider-val" id="valTRef">25°C</span></label>
+                <input type="range" id="tRef" min="15" max="35" step="0.5" value="25">
+            </div>
+            <div class="control-group">
+                <label>Hitzeinsel-Faktor (max.): <span class="slider-val" id="valUHIMax">5°C</span></label>
+                <input type="range" id="uhiMax" min="1" max="10" step="0.5" value="5">
+            </div>
+            <div class="control-group">
+                <label>
+                    Asphalt-Albedo
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Rückstrahlvermögen des Belags. Dunkler Asphalt (0.08) schluckt fast alles Licht, helle Spezialbeläge (0.35) reflektieren deutlich mehr.</span>
+                    </span>
+                </label>
+                <select id="asphaltAlbedo" style="width:100%; margin-top:5px;">
+                    <option value="0.08">Dunkler Asphalt (0.08)</option>
+                    <option value="0.12" selected>Standard-Asphalt (0.12)</option>
+                    <option value="0.2">Grauer Belag (0.20)</option>
+                    <option value="0.35">Cool Pavement (0.35)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- ZEITLEISTE -->
+    <div class="card">
+        <h2>
+            Tageszeit-Simulation
+            <span class="has-tooltip">
+                <span class="tooltip-icon">i</span>
+                <span class="tooltip-text">Wähle eine Uhrzeit oder starte den Zeitraffer, um zu sehen, wie sich Luft- und Oberflächentemperatur im Tagesverlauf entwickeln.</span>
+            </span>
+        </h2>
+        <div class="timeline-controls">
+            <button id="playBtn">▶ Zeitraffer starten</button>
+            <input type="range" id="hourSlider" min="0" max="23" step="1" value="13">
+            <span id="hourLabel">13:00</span>
+        </div>
+    </div>
+
+    <!-- CHART -->
+    <div class="card">
+        <h2>Temperaturverlauf über 24 Stunden</h2>
+        <div class="chart-wrap">
+            <canvas id="dayChart"></canvas>
+        </div>
+    </div>
+
+    <!-- METRIK-KARTEN -->
+    <div class="card">
+        <h2>Messwerte zur gewählten Uhrzeit</h2>
+        <div class="metrics-grid">
+            <div class="metric-card" style="border-left-color:#e74c3c;">
+                <div class="metric-title">
+                    Gefühlte Lufttemperatur
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Die berechnete städtische Lufttemperatur (T_air) zur gewählten Stunde, unter Berücksichtigung der lokalen Kühlleistung.</span>
+                    </span>
+                </div>
+                <div class="metric-value" id="mAirTemp">-- °C</div>
+            </div>
+            <div class="metric-card" style="border-left-color:#e67e22;">
+                <div class="metric-title">
+                    Max. Oberflächentemperatur
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Reale Erhitzung von Boden/Dach bei direkter Sonneneinstrahlung. Unbeschatteter dunkler Asphalt erreicht in Zürich bis zu 58°C.</span>
+                    </span>
+                </div>
+                <div class="metric-value" id="mSurfTemp">-- °C</div>
+            </div>
+            <div class="metric-card" style="border-left-color:#2ecc71;">
+                <div class="metric-title">
+                    InVEST Kühlleistung
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Physikalischer Kühlungs-Index (0-100%): 60% Baumschatten, 20% Albedo, 20% Verdunstung (Evapotranspiration).</span>
+                    </span>
+                </div>
+                <div class="metric-value" id="mCC">-- %</div>
+            </div>
+            <div class="metric-card" style="border-left-color:#3498db;">
+                <div class="metric-title">
+                    Verhinderte Erwärmung
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Temperaturdifferenz gegenüber dem Worst-Case-Szenario ohne jegliche Kühlleistung, zur gleichen Stunde.</span>
+                    </span>
+                </div>
+                <div class="metric-value" id="mReduction">-- °C</div>
+            </div>
+            <div class="metric-card" style="border-left-color:#9b59b6;">
+                <div class="metric-title">
+                    Eingesparte AC-Energie
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Hochgerechneter jährlicher Stromspareffekt für Raumklimatisierung (ca. 1.5 kWh/°C pro m² und Jahr, pro 100m² Grundfläche).</span>
+                    </span>
+                </div>
+                <div class="metric-value" id="mEnergy">-- kWh</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DUELL-MODUS: ZWEI STANDORTE IM VERGLEICH -->
+    <div class="card">
+        <h2>
+            ⚔️ Duell-Modus: Zwei Standorte im Vergleich
+            <span class="has-tooltip">
+                <span class="tooltip-icon">i</span>
+                <span class="tooltip-text">Wähle zwei Orte oder Siedlungstypen (z.B. eine dicht bebaute Stadt gegen ein Dorf) und vergleiche live im Tagesverlauf, wie stark sich die Bebauung auf Temperatur und Energiebedarf auswirkt.</span>
+            </span>
+        </h2>
+
+        <div class="duel-grid">
+            <div class="duel-panel duel-a">
+                <h3>📍 Standort A</h3>
+                <select id="presetA"></select>
+                <p class="duel-preset-desc" id="presetDesc_A"></p>
+                <div class="composition-grid duel-mini-grid">
+                    <div class="control-group">
+                        <label>Asphalt: <span class="slider-val" id="valAsphalt_A">--%</span></label>
+                        <input type="range" id="pctAsphalt_A" min="0" max="100" value="30">
+                    </div>
+                    <div class="control-group">
+                        <label>Poröser Belag: <span class="slider-val" id="valPorous_A">--%</span></label>
+                        <input type="range" id="pctPorous_A" min="0" max="100" value="10">
+                    </div>
+                    <div class="control-group">
+                        <label>Gebäude: <span class="slider-val" id="valBuildings_A">--%</span></label>
+                        <input type="range" id="pctBuildings_A" min="0" max="100" value="25">
+                    </div>
+                    <div class="control-group">
+                        <label>Grünfläche: <span class="slider-val" id="valGreen_A">--%</span></label>
+                        <input type="range" id="pctGreen_A" min="0" max="100" value="20">
+                    </div>
+                    <div class="control-group">
+                        <label>Bäume: <span class="slider-val" id="valTrees_A">--%</span></label>
+                        <input type="range" id="pctTrees_A" min="0" max="100" value="15">
+                    </div>
+                    <div class="control-group">
+                        <label>Dachbegrünung: <span class="slider-val" id="valGreenRoofs_A">--%</span></label>
+                        <input type="range" id="pctGreenRoofs_A" min="0" max="100" value="50">
+                    </div>
+                    <div class="control-group">
+                        <label>Referenztemp.: <span class="slider-val" id="valTRef_A">--°C</span></label>
+                        <input type="range" id="tRef_A" min="15" max="35" step="0.5" value="25">
+                    </div>
+                    <div class="control-group">
+                        <label>Hitzeinsel-Faktor: <span class="slider-val" id="valUHIMax_A">--°C</span></label>
+                        <input type="range" id="uhiMax_A" min="0.5" max="10" step="0.1" value="5">
+                    </div>
+                    <div class="control-group">
+                        <label>Asphalt-Albedo</label>
+                        <select id="asphaltAlbedo_A" style="width:100%; margin-top:5px;">
+                            <option value="0.08">Dunkel (0.08)</option>
+                            <option value="0.12" selected>Standard (0.12)</option>
+                            <option value="0.2">Grau (0.20)</option>
+                            <option value="0.35">Cool Pavement (0.35)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="duel-panel duel-b">
+                <h3>📍 Standort B</h3>
+                <select id="presetB"></select>
+                <p class="duel-preset-desc" id="presetDesc_B"></p>
+                <div class="composition-grid duel-mini-grid">
+                    <div class="control-group">
+                        <label>Asphalt: <span class="slider-val" id="valAsphalt_B">--%</span></label>
+                        <input type="range" id="pctAsphalt_B" min="0" max="100" value="10">
+                    </div>
+                    <div class="control-group">
+                        <label>Poröser Belag: <span class="slider-val" id="valPorous_B">--%</span></label>
+                        <input type="range" id="pctPorous_B" min="0" max="100" value="7">
+                    </div>
+                    <div class="control-group">
+                        <label>Gebäude: <span class="slider-val" id="valBuildings_B">--%</span></label>
+                        <input type="range" id="pctBuildings_B" min="0" max="100" value="5">
+                    </div>
+                    <div class="control-group">
+                        <label>Grünfläche: <span class="slider-val" id="valGreen_B">--%</span></label>
+                        <input type="range" id="pctGreen_B" min="0" max="100" value="55">
+                    </div>
+                    <div class="control-group">
+                        <label>Bäume: <span class="slider-val" id="valTrees_B">--%</span></label>
+                        <input type="range" id="pctTrees_B" min="0" max="100" value="25">
+                    </div>
+                    <div class="control-group">
+                        <label>Dachbegrünung: <span class="slider-val" id="valGreenRoofs_B">--%</span></label>
+                        <input type="range" id="pctGreenRoofs_B" min="0" max="100" value="5">
+                    </div>
+                    <div class="control-group">
+                        <label>Referenztemp.: <span class="slider-val" id="valTRef_B">--°C</span></label>
+                        <input type="range" id="tRef_B" min="15" max="35" step="0.5" value="25">
+                    </div>
+                    <div class="control-group">
+                        <label>Hitzeinsel-Faktor: <span class="slider-val" id="valUHIMax_B">--°C</span></label>
+                        <input type="range" id="uhiMax_B" min="0.5" max="10" step="0.1" value="1.2">
+                    </div>
+                    <div class="control-group">
+                        <label>Asphalt-Albedo</label>
+                        <select id="asphaltAlbedo_B" style="width:100%; margin-top:5px;">
+                            <option value="0.08">Dunkel (0.08)</option>
+                            <option value="0.12" selected>Standard (0.12)</option>
+                            <option value="0.2">Grau (0.20)</option>
+                            <option value="0.35">Cool Pavement (0.35)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="timeline-controls" style="margin-top: 20px;">
+            <button id="playBtnDuel">▶ Zeitraffer starten</button>
+            <input type="range" id="hourSliderDuel" min="0" max="23" step="1" value="13">
+            <span id="hourLabelDuel">13:00</span>
+        </div>
+
+        <div class="chart-wrap" style="margin-top: 16px; height: 320px;">
+            <canvas id="duelChart"></canvas>
+        </div>
+
+        <div class="duel-results-grid">
+            <div class="duel-result-col col-a">
+                <h4 id="resultTitle_A">Standort A</h4>
+                <div class="mini-metric"><span>Lufttemperatur</span><strong id="dAirTempA">-- °C</strong></div>
+                <div class="mini-metric"><span>Oberflächentemperatur</span><strong id="dSurfTempA">-- °C</strong></div>
+                <div class="mini-metric"><span>InVEST Kühlleistung</span><strong id="dCCA">-- %</strong></div>
+                <div class="mini-metric"><span>Eingesparte AC-Energie</span><strong id="dEnergyA">-- kWh</strong></div>
+            </div>
+
+            <div class="duel-winner-badge" id="duelWinnerBadge">
+                <span class="w-title" id="duelWinnerTitle">--</span>
+                <span class="w-value" id="duelWinnerValue">--</span>
+            </div>
+
+            <div class="duel-result-col col-b">
+                <h4 id="resultTitle_B">Standort B</h4>
+                <div class="mini-metric"><span>Lufttemperatur</span><strong id="dAirTempB">-- °C</strong></div>
+                <div class="mini-metric"><span>Oberflächentemperatur</span><strong id="dSurfTempB">-- °C</strong></div>
+                <div class="mini-metric"><span>InVEST Kühlleistung</span><strong id="dCCB">-- %</strong></div>
+                <div class="mini-metric"><span>Eingesparte AC-Energie</span><strong id="dEnergyB">-- kWh</strong></div>
+            </div>
+        </div>
+    </div>
+
+    <footer>Basierend auf dem InVEST Urban Cooling Model &middot; Kalibriert mit BAFU- und ETHZ-Daten</footer>
+</div>
+
+<script src="microclimate-engine-v2.js"></script>
+<script>
+(function () {
+    'use strict';
+
+    // ---------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------
+    const safeNum = (v, fallback) => (typeof v === 'number' && !isNaN(v)) ? v : fallback;
+    const fmt = (v, digits) => safeNum(v, 0).toFixed(digits);
+
+    function hexToRgb(hex) {
+        const clean = hex.replace('#', '');
+        const bigint = parseInt(clean, 16);
+        return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+    }
+    function rgbToHex(rgb) {
+        return '#' + rgb.map(c => Math.round(Math.max(0, Math.min(255, c))).toString(16).padStart(2, '0')).join('');
+    }
+    function lerpColor(hexA, hexB, t) {
+        const a = hexToRgb(hexA), b = hexToRgb(hexB);
+        const mixed = a.map((ch, i) => ch + (b[i] - ch) * t);
+        return rgbToHex(mixed);
+    }
+    function easeCurve(x) {
+        const c = Math.max(0, Math.min(1, x));
+        return (1 - Math.cos(c * Math.PI)) / 2;
+    }
+
+    // ---------------------------------------------------------------
+    // Dynamic atmospheric background (Night / Sunrise / Midday / Sunset)
+    // ---------------------------------------------------------------
+    const BG_ANCHORS = [
+        { hour: 1,    from: '#0f172a', to: '#1e1b4b' }, // Nacht (22-04)
+        { hour: 6,    from: '#fdba74', to: '#fed7aa' }, // Sonnenaufgang (05-07)
+        { hour: 13.5, from: '#e0f2fe', to: '#fef08a' }, // Mittag (11-16)
+        { hour: 19.5, from: '#f97316', to: '#451a03' }, // Sonnenuntergang (18-21)
+        { hour: 25,   from: '#0f172a', to: '#1e1b4b' }  // zurück zur Nacht (Wrap)
+    ];
+
+    function updateBackground(hour) {
+        let h = hour;
+        let lower = BG_ANCHORS[0], upper = BG_ANCHORS[BG_ANCHORS.length - 1];
+        for (let i = 0; i < BG_ANCHORS.length - 1; i++) {
+            if (h >= BG_ANCHORS[i].hour && h <= BG_ANCHORS[i + 1].hour) {
+                lower = BG_ANCHORS[i];
+                upper = BG_ANCHORS[i + 1];
+                break;
+            }
+        }
+        if (h < BG_ANCHORS[0].hour) { h += 24; lower = BG_ANCHORS[BG_ANCHORS.length - 2]; upper = { ...BG_ANCHORS[BG_ANCHORS.length - 1] }; }
+
+        const span = upper.hour - lower.hour;
+        const t = span > 0 ? easeCurve((h - lower.hour) / span) : 0;
+
+        const colorA = lerpColor(lower.from, upper.from, t);
+        const colorB = lerpColor(lower.to, upper.to, t);
+
+        document.documentElement.style.setProperty('--bg-a', colorA);
+        document.documentElement.style.setProperty('--bg-b', colorB);
+    }
+
+    // ---------------------------------------------------------------
+    // Engine wiring
+    // ---------------------------------------------------------------
+    const compositionIds = ['pctAsphalt', 'pctPorous', 'pctBuildings', 'pctGreen', 'pctTrees', 'pctGreenRoofs', 'tRef', 'uhiMax', 'asphaltAlbedo'];
+
+    function readInputs() {
+        const get = id => parseFloat(document.getElementById(id).value);
+        return {
+            pctAsphalt: get('pctAsphalt'),
+            pctPorous: get('pctPorous'),
+            pctBuildings: get('pctBuildings'),
+            pctGreen: get('pctGreen'),
+            pctTrees: get('pctTrees'),
+            pctGreenRoofs: get('pctGreenRoofs'),
+            asphaltAlbedo: get('asphaltAlbedo'),
+            tRef: get('tRef'),
+            uhiMax: get('uhiMax')
+        };
+    }
+
+    let dayData = [];
+
+    function recomputeDayCycle() {
+        const inputs = readInputs();
+
+        document.getElementById('valAsphalt').innerText = inputs.pctAsphalt + '%';
+        document.getElementById('valPorous').innerText = inputs.pctPorous + '%';
+        document.getElementById('valBuildings').innerText = inputs.pctBuildings + '%';
+        document.getElementById('valGreen').innerText = inputs.pctGreen + '%';
+        document.getElementById('valTrees').innerText = inputs.pctTrees + '%';
+        document.getElementById('valGreenRoofs').innerText = inputs.pctGreenRoofs + '%';
+        document.getElementById('valTRef').innerText = inputs.tRef.toFixed(1) + '°C';
+        document.getElementById('valUHIMax').innerText = inputs.uhiMax.toFixed(1) + '°C';
+
+        const engine = new MicroclimateEngine({ t_ref: inputs.tRef, uhi_max: inputs.uhiMax });
+        dayData = engine.simulateDayCycle(inputs);
+
+        chart.data.datasets[0].data = dayData.map(d => safeNum(d.t_ref, inputs.tRef));
+        chart.data.datasets[1].data = dayData.map(d => safeNum(d.airTemperature, inputs.tRef));
+        chart.data.datasets[2].data = dayData.map(d => safeNum(d.surfaceTemperature, inputs.tRef));
+        chart.update('none');
+
+        updateForHour(parseInt(document.getElementById('hourSlider').value, 10));
+    }
+
+    // ---------------------------------------------------------------
+    // Chart.js setup with an inline "active hour" indicator plugin
+    // ---------------------------------------------------------------
+    const activeHourPlugin = {
+        id: 'activeHourLine',
+        afterDraw(c) {
+            const idx = c.$activeHourIndex;
+            if (idx === undefined || idx === null) return;
+            const xScale = c.scales.x;
+            const yScale = c.scales.y;
+            const x = xScale.getPixelForValue(idx);
+            const ctx = c.ctx;
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(x, yScale.top);
+            ctx.lineTo(x, yScale.bottom);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(30, 41, 59, 0.55)';
+            ctx.setLineDash([5, 4]);
+            ctx.stroke();
+            ctx.restore();
+        }
+    };
+
+    const HOUR_LABELS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0') + ':00');
+
+    const chart = new Chart(document.getElementById('dayChart'), {
+        type: 'line',
+        data: {
+            labels: HOUR_LABELS,
+            datasets: [
+                {
+                    label: 'Umland-Temperatur (Referenz)',
+                    data: [],
+                    borderColor: '#2563eb',
+                    borderDash: [6, 4],
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.35
+                },
+                {
+                    label: 'Städtische Lufttemperatur (T_air)',
+                    data: [],
+                    borderColor: '#e67e22',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2.5,
+                    pointRadius: 0,
+                    tension: 0.35
+                },
+                {
+                    label: 'Oberflächentemperatur Asphalt/Boden (T_surface)',
+                    data: [],
+                    borderColor: '#7c2d12',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2.5,
+                    pointRadius: 0,
+                    tension: 0.35
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 14, font: { size: 11 } } },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)} °C`
+                    }
+                }
+            },
+            scales: {
+                x: { title: { display: true, text: 'Uhrzeit' } },
+                y: { title: { display: true, text: 'Temperatur (°C)' } }
+            }
+        },
+        plugins: [activeHourPlugin]
+    });
+
+    // ---------------------------------------------------------------
+    // Timeline / metric cards
+    // ---------------------------------------------------------------
+    function updateForHour(hour) {
+        const h = Math.max(0, Math.min(23, hour));
+        const data = dayData[h] || {};
+
+        document.getElementById('hourSlider').value = h;
+        document.getElementById('hourLabel').innerText = String(h).padStart(2, '0') + ':00';
+
+        document.getElementById('mAirTemp').innerText = fmt(data.airTemperature, 1) + ' °C';
+        document.getElementById('mSurfTemp').innerText = fmt(data.surfaceTemperature, 1) + ' °C';
+        document.getElementById('mCC').innerText = fmt(safeNum(data.coolingCapacity, 0) * 100, 1) + ' %';
+        document.getElementById('mReduction').innerText = fmt(data.tempReduction, 2) + ' °C';
+        document.getElementById('mEnergy').innerText = fmt(data.annualKwhSavingsPer100m2, 0) + ' kWh';
+
+        chart.$activeHourIndex = h;
+        chart.update('none');
+
+        updateBackground(h);
+    }
+
+    // ---------------------------------------------------------------
+    // Play / Pause time-lapse
+    // ---------------------------------------------------------------
+    let playTimer = null;
+    const playBtn = document.getElementById('playBtn');
+
+    function stopPlayback() {
+        clearInterval(playTimer);
+        playTimer = null;
+        playBtn.innerText = '▶ Zeitraffer starten';
+    }
+
+    function startPlayback() {
+        playBtn.innerText = '⏸ Zeitraffer pausieren';
+        playTimer = setInterval(() => {
+            const next = (parseInt(document.getElementById('hourSlider').value, 10) + 1) % 24;
+            updateForHour(next);
+        }, 1000);
+    }
+
+    playBtn.addEventListener('click', () => {
+        if (playTimer) stopPlayback(); else startPlayback();
+    });
+
+    document.getElementById('hourSlider').addEventListener('input', e => {
+        stopPlayback();
+        updateForHour(parseInt(e.target.value, 10));
+    });
+
+    compositionIds.forEach(id => {
+        document.getElementById(id).addEventListener('input', recomputeDayCycle);
+        document.getElementById(id).addEventListener('change', recomputeDayCycle);
+    });
+
+    window.addEventListener('load', recomputeDayCycle);
+
+    // =================================================================
+    // DUELL-MODUS: ZWEI STANDORTE IM VERGLEICH
+    // =================================================================
+
+    // Alle Presets teilen dieselbe Referenztemperatur (25°C) als faire,
+    // gemeinsame Wetterbasis - nur Bebauung/Begrünung und der ortsspezifische
+    // Hitzeinsel-Faktor unterscheiden sich.
+    const PLACE_PRESETS = {
+        // --- Archetypen ---
+        dense_city: {
+            category: 'Archetypen', name: 'Dicht bebaute Grossstadt',
+            description: 'Hoher Versiegelungsgrad, kaum Verschattung – klassische Betonwüste.',
+            pctAsphalt: 45, pctPorous: 5, pctBuildings: 35, pctGreen: 8, pctTrees: 7,
+            pctGreenRoofs: 10, asphaltAlbedo: 0.08, tRef: 25, uhiMax: 6.5
+        },
+        normal_city: {
+            category: 'Archetypen', name: 'Durchschnittliche Stadt',
+            description: 'Typische mitteleuropäische Stadtstruktur mit moderater Durchgrünung.',
+            pctAsphalt: 32, pctPorous: 10, pctBuildings: 25, pctGreen: 20, pctTrees: 13,
+            pctGreenRoofs: 20, asphaltAlbedo: 0.12, tRef: 25, uhiMax: 5.0
+        },
+        urban_land: {
+            category: 'Archetypen', name: 'Siedlungsgebiet (Wohnquartier)',
+            description: 'Lockere Wohnbebauung mit Gärten – deutlich weniger dicht als die Kernstadt.',
+            pctAsphalt: 20, pctPorous: 12, pctBuildings: 20, pctGreen: 30, pctTrees: 18,
+            pctGreenRoofs: 15, asphaltAlbedo: 0.12, tRef: 25, uhiMax: 3.5
+        },
+        banlieue: {
+            category: 'Archetypen', name: 'Banlieue / Trabantenstadt',
+            description: 'Dichte Blockrandbebauung am Stadtrand, wenig Grünraum zwischen den Hochhäusern.',
+            pctAsphalt: 38, pctPorous: 7, pctBuildings: 33, pctGreen: 14, pctTrees: 8,
+            pctGreenRoofs: 8, asphaltAlbedo: 0.08, tRef: 25, uhiMax: 5.8
+        },
+        countryside: {
+            category: 'Archetypen', name: 'Ländliches Gebiet',
+            description: 'Offene Landschaft mit vereinzelter Bebauung, viel Wiese und Feld.',
+            pctAsphalt: 8, pctPorous: 7, pctBuildings: 5, pctGreen: 55, pctTrees: 25,
+            pctGreenRoofs: 5, asphaltAlbedo: 0.20, tRef: 25, uhiMax: 1.2
+        },
+        forest: {
+            category: 'Archetypen', name: 'Wald',
+            description: 'Nahezu vollständige Baumkronenbedeckung – das natürliche Kühlungs-Optimum.',
+            pctAsphalt: 1, pctPorous: 1, pctBuildings: 0, pctGreen: 8, pctTrees: 90,
+            pctGreenRoofs: 0, asphaltAlbedo: 0.12, tRef: 25, uhiMax: 0.5
+        },
+        // --- Schweizer Städte (reale Arealstatistik-Daten) ---
+        carouge: {
+            category: 'Schweizer Städte', name: 'Carouge (GE)',
+            description: 'Schweizweit am stärksten versiegelt (79%). Extreme Hitzeinsel.',
+            pctAsphalt: 55, pctPorous: 5, pctBuildings: 24, pctGreen: 11, pctTrees: 5,
+            pctGreenRoofs: 10, asphaltAlbedo: 0.08, tRef: 25, uhiMax: 6.5
+        },
+        emmen: {
+            category: 'Schweizer Städte', name: 'Emmen (LU)',
+            description: 'Spitzenreiter der Versiegelung in der Deutschschweiz (70%).',
+            pctAsphalt: 45, pctPorous: 5, pctBuildings: 20, pctGreen: 20, pctTrees: 10,
+            pctGreenRoofs: 5, asphaltAlbedo: 0.12, tRef: 25, uhiMax: 5.5
+        },
+        zuerich: {
+            category: 'Schweizer Städte', name: 'Zürich (Zentrum)',
+            description: 'Urbane Kernzone mit ca. 15.4% Baumkronenanteil.',
+            pctAsphalt: 40, pctPorous: 10, pctBuildings: 25, pctGreen: 10, pctTrees: 15,
+            pctGreenRoofs: 15, asphaltAlbedo: 0.08, tRef: 25, uhiMax: 6.0
+        },
+        lausanne: {
+            category: 'Schweizer Städte', name: 'Lausanne (VD)',
+            description: 'EPFL-Forschungsgebiet. Starkes Relief, mässige Begrünung.',
+            pctAsphalt: 35, pctPorous: 10, pctBuildings: 20, pctGreen: 15, pctTrees: 20,
+            pctGreenRoofs: 20, asphaltAlbedo: 0.12, tRef: 25, uhiMax: 5.0
+        },
+        riehen: {
+            category: 'Schweizer Städte', name: 'Riehen (BS)',
+            description: 'Grünste Grossgemeinde der Schweiz (nur 46% versiegelt).',
+            pctAsphalt: 25, pctPorous: 15, pctBuildings: 6, pctGreen: 30, pctTrees: 24,
+            pctGreenRoofs: 40, asphaltAlbedo: 0.20, tRef: 25, uhiMax: 3.5
+        },
+        dorf: {
+            category: 'Schweizer Städte', name: 'Mittelland-Dorf (BE)',
+            description: 'Typische ländliche Struktur. Geringe Luftüberwärmung, aber lokale Hitze-Hotspots.',
+            pctAsphalt: 15, pctPorous: 10, pctBuildings: 8, pctGreen: 45, pctTrees: 22,
+            pctGreenRoofs: 5, asphaltAlbedo: 0.12, tRef: 25, uhiMax: 1.5
+        },
+        renens: {
+            category: 'Schweizer Städte', name: 'Renens (VD)',
+            description: 'Zweithöchste Versiegelung der Schweiz (73%). Extrem dichte Bebauung.',
+            pctAsphalt: 50, pctPorous: 8, pctBuildings: 23, pctGreen: 12, pctTrees: 7,
+            pctGreenRoofs: 10, asphaltAlbedo: 0.08, tRef: 25, uhiMax: 6.2
+        },
+        genf: {
+            category: 'Schweizer Städte', name: 'Genf (GE)',
+            description: 'Dicht bebaute Metropole mit 71% Versiegelungsgrad. Starke Hitzeinsel.',
+            pctAsphalt: 46, pctPorous: 10, pctBuildings: 25, pctGreen: 11, pctTrees: 8,
+            pctGreenRoofs: 15, asphaltAlbedo: 0.08, tRef: 25, uhiMax: 6.0
+        },
+        vevey: {
+            category: 'Schweizer Städte', name: 'Vevey (VD)',
+            description: 'Bekannt für extreme Tropennächte (nachts bis zu 24.7°C am Seeufer).',
+            pctAsphalt: 38, pctPorous: 12, pctBuildings: 20, pctGreen: 15, pctTrees: 15,
+            pctGreenRoofs: 20, asphaltAlbedo: 0.12, tRef: 25, uhiMax: 5.8
+        }
+    };
+
+    function populatePresetSelect(select) {
+        const byCategory = {};
+        Object.entries(PLACE_PRESETS).forEach(([key, preset]) => {
+            (byCategory[preset.category] = byCategory[preset.category] || []).push([key, preset]);
+        });
+
+        const blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = '-- Eigene Konfiguration --';
+        select.appendChild(blank);
+
+        Object.entries(byCategory).forEach(([category, entries]) => {
+            const group = document.createElement('optgroup');
+            group.label = category;
+            entries.forEach(([key, preset]) => {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = preset.name;
+                group.appendChild(opt);
+            });
+            select.appendChild(group);
+        });
+    }
+
+    function applyDuelPreset(suffix, key) {
+        const descEl = document.getElementById('presetDesc_' + suffix);
+        const titleEl = document.getElementById('resultTitle_' + suffix);
+        const preset = PLACE_PRESETS[key];
+
+        if (!preset) {
+            descEl.innerText = '';
+            titleEl.innerText = 'Standort ' + suffix;
+            return;
+        }
+
+        descEl.innerText = preset.description;
+        titleEl.innerText = 'Standort ' + suffix + ' – ' + preset.name;
+
+        document.getElementById('pctAsphalt_' + suffix).value = preset.pctAsphalt;
+        document.getElementById('pctPorous_' + suffix).value = preset.pctPorous;
+        document.getElementById('pctBuildings_' + suffix).value = preset.pctBuildings;
+        document.getElementById('pctGreen_' + suffix).value = preset.pctGreen;
+        document.getElementById('pctTrees_' + suffix).value = preset.pctTrees;
+        document.getElementById('pctGreenRoofs_' + suffix).value = preset.pctGreenRoofs;
+        document.getElementById('asphaltAlbedo_' + suffix).value = preset.asphaltAlbedo;
+        document.getElementById('tRef_' + suffix).value = preset.tRef;
+        document.getElementById('uhiMax_' + suffix).value = preset.uhiMax;
+    }
+
+    function readDuelInputs(suffix) {
+        const get = id => parseFloat(document.getElementById(id + '_' + suffix).value);
+        return {
+            pctAsphalt: get('pctAsphalt'), pctPorous: get('pctPorous'), pctBuildings: get('pctBuildings'),
+            pctGreen: get('pctGreen'), pctTrees: get('pctTrees'), pctGreenRoofs: get('pctGreenRoofs'),
+            asphaltAlbedo: get('asphaltAlbedo'), tRef: get('tRef'), uhiMax: get('uhiMax')
+        };
+    }
+
+    function updateDuelSliderLabels(suffix, inputs) {
+        document.getElementById('valAsphalt_' + suffix).innerText = inputs.pctAsphalt + '%';
+        document.getElementById('valPorous_' + suffix).innerText = inputs.pctPorous + '%';
+        document.getElementById('valBuildings_' + suffix).innerText = inputs.pctBuildings + '%';
+        document.getElementById('valGreen_' + suffix).innerText = inputs.pctGreen + '%';
+        document.getElementById('valTrees_' + suffix).innerText = inputs.pctTrees + '%';
+        document.getElementById('valGreenRoofs_' + suffix).innerText = inputs.pctGreenRoofs + '%';
+        document.getElementById('valTRef_' + suffix).innerText = inputs.tRef.toFixed(1) + '°C';
+        document.getElementById('valUHIMax_' + suffix).innerText = inputs.uhiMax.toFixed(1) + '°C';
+    }
+
+    let dayDataA = [], dayDataB = [];
+
+    const duelChart = new Chart(document.getElementById('duelChart'), {
+        type: 'line',
+        data: {
+            labels: HOUR_LABELS,
+            datasets: [
+                {
+                    label: 'Standort A – Lufttemperatur (T_air)',
+                    data: [], borderColor: '#2563eb', backgroundColor: 'transparent',
+                    borderWidth: 2.5, pointRadius: 0, tension: 0.35
+                },
+                {
+                    label: 'Standort A – Oberflächentemperatur (T_surface)',
+                    data: [], borderColor: '#0ea5e9', backgroundColor: 'transparent',
+                    borderWidth: 2, borderDash: [5, 4], pointRadius: 0, tension: 0.35
+                },
+                {
+                    label: 'Standort B – Lufttemperatur (T_air)',
+                    data: [], borderColor: '#ea580c', backgroundColor: 'transparent',
+                    borderWidth: 2.5, pointRadius: 0, tension: 0.35
+                },
+                {
+                    label: 'Standort B – Oberflächentemperatur (T_surface)',
+                    data: [], borderColor: '#7c2d12', backgroundColor: 'transparent',
+                    borderWidth: 2, borderDash: [5, 4], pointRadius: 0, tension: 0.35
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 14, font: { size: 10.5 } } },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)} °C`
+                    }
+                }
+            },
+            scales: {
+                x: { title: { display: true, text: 'Uhrzeit' } },
+                y: { title: { display: true, text: 'Temperatur (°C)' } }
+            }
+        },
+        plugins: [activeHourPlugin]
+    });
+
+    function recomputeDuel() {
+        const inputsA = readDuelInputs('A');
+        const inputsB = readDuelInputs('B');
+        updateDuelSliderLabels('A', inputsA);
+        updateDuelSliderLabels('B', inputsB);
+
+        const engineA = new MicroclimateEngine({ t_ref: inputsA.tRef, uhi_max: inputsA.uhiMax });
+        const engineB = new MicroclimateEngine({ t_ref: inputsB.tRef, uhi_max: inputsB.uhiMax });
+        dayDataA = engineA.simulateDayCycle(inputsA);
+        dayDataB = engineB.simulateDayCycle(inputsB);
+
+        duelChart.data.datasets[0].data = dayDataA.map(d => safeNum(d.airTemperature, inputsA.tRef));
+        duelChart.data.datasets[1].data = dayDataA.map(d => safeNum(d.surfaceTemperature, inputsA.tRef));
+        duelChart.data.datasets[2].data = dayDataB.map(d => safeNum(d.airTemperature, inputsB.tRef));
+        duelChart.data.datasets[3].data = dayDataB.map(d => safeNum(d.surfaceTemperature, inputsB.tRef));
+        duelChart.update('none');
+
+        updateDuelHour(parseInt(document.getElementById('hourSliderDuel').value, 10));
+    }
+
+    function updateDuelHour(hour) {
+        const h = Math.max(0, Math.min(23, hour));
+        document.getElementById('hourSliderDuel').value = h;
+        document.getElementById('hourLabelDuel').innerText = String(h).padStart(2, '0') + ':00';
+
+        const a = dayDataA[h] || {};
+        const b = dayDataB[h] || {};
+
+        document.getElementById('dAirTempA').innerText = fmt(a.airTemperature, 1) + ' °C';
+        document.getElementById('dSurfTempA').innerText = fmt(a.surfaceTemperature, 1) + ' °C';
+        document.getElementById('dCCA').innerText = fmt(safeNum(a.coolingCapacity, 0) * 100, 1) + ' %';
+        document.getElementById('dEnergyA').innerText = fmt(a.annualKwhSavingsPer100m2, 0) + ' kWh';
+
+        document.getElementById('dAirTempB').innerText = fmt(b.airTemperature, 1) + ' °C';
+        document.getElementById('dSurfTempB').innerText = fmt(b.surfaceTemperature, 1) + ' °C';
+        document.getElementById('dCCB').innerText = fmt(safeNum(b.coolingCapacity, 0) * 100, 1) + ' %';
+        document.getElementById('dEnergyB').innerText = fmt(b.annualKwhSavingsPer100m2, 0) + ' kWh';
+
+        const airA = safeNum(a.airTemperature, 0);
+        const airB = safeNum(b.airTemperature, 0);
+        const diff = airB - airA;
+
+        const titleEl = document.getElementById('duelWinnerTitle');
+        const valueEl = document.getElementById('duelWinnerValue');
+        const badge = document.getElementById('duelWinnerBadge');
+
+        if (Math.abs(diff) < 0.05) {
+            titleEl.innerText = 'Gleichstand';
+            valueEl.innerText = 'Beide Standorte gleich warm';
+            badge.style.background = '#475569';
+        } else if (diff > 0) {
+            titleEl.innerText = '🏆 Kühler: Standort A';
+            valueEl.innerText = '−' + diff.toFixed(1) + ' °C gegenüber B';
+            badge.style.background = '#2563eb';
+        } else {
+            titleEl.innerText = '🏆 Kühler: Standort B';
+            valueEl.innerText = '−' + Math.abs(diff).toFixed(1) + ' °C gegenüber A';
+            badge.style.background = '#ea580c';
+        }
+
+        duelChart.$activeHourIndex = h;
+        duelChart.update('none');
+    }
+
+    const duelControlIds = ['pctAsphalt', 'pctPorous', 'pctBuildings', 'pctGreen', 'pctTrees', 'pctGreenRoofs', 'tRef', 'uhiMax', 'asphaltAlbedo'];
+    ['A', 'B'].forEach(suffix => {
+        duelControlIds.forEach(id => {
+            const el = document.getElementById(id + '_' + suffix);
+            el.addEventListener('input', recomputeDuel);
+            el.addEventListener('change', recomputeDuel);
+        });
+    });
+
+    document.getElementById('presetA').addEventListener('change', e => { applyDuelPreset('A', e.target.value); recomputeDuel(); });
+    document.getElementById('presetB').addEventListener('change', e => { applyDuelPreset('B', e.target.value); recomputeDuel(); });
+
+    let playTimerDuel = null;
+    const playBtnDuel = document.getElementById('playBtnDuel');
+
+    function stopDuelPlayback() {
+        clearInterval(playTimerDuel);
+        playTimerDuel = null;
+        playBtnDuel.innerText = '▶ Zeitraffer starten';
+    }
+
+    function startDuelPlayback() {
+        playBtnDuel.innerText = '⏸ Zeitraffer pausieren';
+        playTimerDuel = setInterval(() => {
+            const next = (parseInt(document.getElementById('hourSliderDuel').value, 10) + 1) % 24;
+            updateDuelHour(next);
+        }, 1000);
+    }
+
+    playBtnDuel.addEventListener('click', () => {
+        if (playTimerDuel) stopDuelPlayback(); else startDuelPlayback();
+    });
+
+    document.getElementById('hourSliderDuel').addEventListener('input', e => {
+        stopDuelPlayback();
+        updateDuelHour(parseInt(e.target.value, 10));
+    });
+
+    window.addEventListener('load', () => {
+        populatePresetSelect(document.getElementById('presetA'));
+        populatePresetSelect(document.getElementById('presetB'));
+
+        document.getElementById('presetA').value = 'dense_city';
+        document.getElementById('presetB').value = 'countryside';
+        applyDuelPreset('A', 'dense_city');
+        applyDuelPreset('B', 'countryside');
+
+        recomputeDuel();
+    });
+})();
+</script>
+</body>
+</html>

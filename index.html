@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mikroklima & Hitzeinsel-Simulator Schweiz v3.0</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #2ecc71;
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text: #2c3e50;
+            --tooltip-bg: #2c3e50;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 1100px;
+            width: 100%;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: #fdfdfd;
+            padding: 20px;
+            border: 1px solid #eaeded;
+            border-radius: 8px;
+        }
+
+        h2 {
+            font-size: 1.2rem;
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 8px;
+            margin-top: 0;
+            color: var(--primary);
+        }
+
+        .control-group {
+            margin-bottom: 18px;
+            background: #fcfcfc;
+            padding: 10px 12px;
+            border-radius: 6px;
+            border-left: 3px solid #ddd;
+            position: relative;
+        }
+
+        .control-group.special {
+            border-left-color: #3498db;
+            background: #f4f9fd;
+        }
+
+        /* Tooltip-Styling */
+        .tooltip-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background: #bdc3c7;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            font-size: 11px;
+            line-height: 16px;
+            cursor: help;
+            margin-left: 6px;
+            font-weight: bold;
+            transition: background 0.2s;
+            vertical-align: middle;
+        }
+
+        .tooltip-icon:hover {
+            background: var(--primary);
+        }
+
+        .has-tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip-text {
+            visibility: hidden;
+            width: 260px;
+            background-color: var(--tooltip-bg);
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 10px 12px;
+            position: absolute;
+            z-index: 10;
+            bottom: 125%; /* Positioniert den Tooltip über dem Element */
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.8rem;
+            font-weight: normal;
+            line-height: 1.35;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: var(--tooltip-bg) transparent transparent transparent;
+        }
+
+        .has-tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+        }
+
+        .slider-val {
+            float: right;
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        .special .slider-val {
+            color: #2980b9;
+        }
+
+        input[type="range"], select {
+            width: 100%;
+            margin-top: 5px;
+            box-sizing: border-box;
+        }
+
+        .metric-card {
+            background: #f8f9fa;
+            border-left: 4px solid var(--accent);
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 0 8px 8px 0;
+            position: relative;
+        }
+
+        .metric-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: #7f8c8d;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+        }
+
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin-top: 5px;
+        }
+
+        .comfort-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+
+        .chart-simulation {
+            display: flex;
+            height: 35px;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 15px;
+            border: 1px solid #ddd;
+        }
+
+        .segment {
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .seg-asphalt { background-color: #7f8c8d; }
+        .seg-porous { background-color: #a5b1b2; }
+        .seg-buildings { background-color: #d35400; }
+        .seg-green { background-color: #2ecc71; }
+        .seg-trees { background-color: #27ae60; }
+
+        /* --- Seitennavigation --- */
+        .page-nav {
+            max-width: 1100px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 0 0 16px 0;
+        }
+        .page-nav a {
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 20px;
+            transition: background 0.2s, color 0.2s;
+        }
+        .page-nav a.active {
+            background: var(--primary);
+            color: #fff;
+        }
+        .page-nav a:not(.active) {
+            background: #eaeded;
+            color: var(--primary);
+        }
+        .page-nav a:not(.active):hover {
+            background: #dfe3e4;
+        }
+    </style>
+</head>
+<body>
+
+<nav class="page-nav">
+    <a href="index.html" class="active">🏙️ Simulator</a>
+    <a href="day-cycle.html">🕐 Tagesverlauf &amp; Duell-Modus</a>
+</nav>
+
+<div class="container">
+    <h1>Mikroklima-Simulator Schweiz v3.0 🇨🇭</h1>
+    <p class="subtitle">Simuliere den Effekt von Asphalt, porösen Belägen, begrünten Dächern und Bäumen auf deine Umgebung</p>
+
+    <div class="grid">
+        <!-- LINKES PANEL: STEUERUNG -->
+        <div class="panel">
+            <div class="control-group" style="background: #ebf5fb; border-left: 3px solid #2980b9;">
+                <label style="color: #2c3e50;">
+                    🇨🇭 Schweizer Städte-Voreinstellungen:
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Wähle eine Schweizer Gemeinde aus, um deren reale Strukturdaten aus der Arealstatistik direkt zu laden.</span>
+                    </span>
+                </label>
+<select id="cityPreset">
+    <option value="" selected>-- Eigene Konfiguration erstellen --</option>
+    <option value="carouge">Carouge GE (Betonwüste - 79% versiegelt)</option>
+    <option value="emmen">Emmen LU (Spitzenreiter Deutschschweiz - 70% versiegelt)</option>
+    <option value="zuerich">Zürich Zentrum (Urbane Dichte)</option>
+    <option value="lausanne">Lausanne VD (EPFL Forschungsgebiet)</option>
+    <option value="riehen">Riehen BS (Grüne Oase - 46% versiegelt)</option>
+    <!-- Neue ländliche und urbane Presets aus den Quellen: -->
+    <option value="dorf">Mittelland-Dorf BE (Ländliche Struktur)</option>
+    <option value="renens">Renens VD (Zweithöchste Versiegelung - 73%)</option>
+    <option value="genf">Genf GE (Dicht bebaute Metropole - 71%)</option>
+    <option value="vevey">Vevey VD (Uferzone / Tropennacht-Hotspot)</option>
+</select>
+                <p id="cityDesc" style="font-size: 0.8rem; margin: 5px 0 0 0; color: #7f8c8d; font-style: italic;"></p>
+            </div>
+
+            <h2>Flächenaufteilung (Total 100%)</h2>
+            
+            <div class="control-group">
+                <label>
+                    Standard-Asphalt: <span class="slider-val" id="valAsphalt">30%</span>
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Klassische, wasser- und luftdichte Strasse. Speichert tagsüber massiv Wärme und verhindert nachts die Abkühlung.</span>
+                    </span>
+                </label>
+                <input type="range" id="pctAsphalt" min="0" max="100" value="30">
+            </div>
+
+            <div class="control-group special">
+                <label>
+                    Poröser Sickerbelag (Wasserdurchlässig): <span class="slider-val" id="valPorous">10%</span>
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Sickerfähige Beläge (wie Porenbeton oder Rasengittersteine). Lassen Wasser versickern und kühlen die Umgebung durch Verdunstung.</span>
+                    </span>
+                </label>
+                <input type="range" id="pctPorous" min="0" max="100" value="10">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Gebäudegrundfläche (Beton): <span class="slider-val" id="valBuildings">25%</span>
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Grundfläche von Häusern und Betonbauten. Trägt durch grosse Baumassen erheblich zum sommerlichen Wärmeinseleffekt bei.</span>
+                    </span>
+                </label>
+                <input type="range" id="pctBuildings" min="0" max="100" value="25">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Niedrige Vegetation (Lawn/Wiese): <span class="slider-val" id="valGreen">20%</span>
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Rasenflächen, Beete und Sträucher. Sie reflektieren Sonnenlicht besser als Beton (Albedo ~0.20) und kühlen aktiv über Verdunstung.</span>
+                    </span>
+                </label>
+                <input type="range" id="pctGreen" min="0" max="100" value="20">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Baumkronenfläche (Bäume): <span class="slider-val" id="valTrees">15%</span>
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Die wichtigste Kühlkomponente (60% Gewicht im InVEST-Modell). Spendet Schatten und kühlt massiv durch Transpiration.</span>
+                    </span>
+                </label>
+                <input type="range" id="pctTrees" min="0" max="100" value="15">
+            </div>
+
+            <div class="chart-simulation">
+                <div id="segAsphalt" class="segment seg-asphalt" title="Asphalt">Asphalt</div>
+                <div id="segPorous" class="segment seg-porous" title="Porös">Porös</div>
+                <div id="segBuildings" class="segment seg-buildings" title="Gebäude">Gebäude</div>
+                <div id="segGreen" class="segment seg-green" title="Grünfläche">Grün</div>
+                <div id="segTrees" class="segment seg-trees" title="Bäume">Bäume</div>
+            </div>
+
+            <h2 style="margin-top: 30px;">Klimaanpassung & Umwelt</h2>
+
+            <div class="control-group special">
+                <label>
+                    Anteil begrünter Dächer (Dachbegrünung): <span class="slider-val" id="valGreenRoofs">50%</span>
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Prozentsatz der Gebäudedächer, die bepflanzt sind. Erhöht die Verdunstungskühlung (Kc 0.50) und reflektiert mehr Sonnenstrahlung als Bitumen.</span>
+                    </span>
+                </label>
+                <input type="range" id="pctGreenRoofs" min="0" max="100" value="50">
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Farbe & Albedo des Asphalts
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Albedo beschreibt das Rückstrahlvermögen. Dunkler Asphalt schluckt fast alles Licht (0.08); weisse Spezialbeläge werfen es zurück (0.35).</span>
+                    </span>
+                </label>
+                <select id="asphaltAlbedo">
+                    <option value="0.08">Klassischer, dunkler Asphalt (Albedo 0.08)</option>
+                    <option value="0.12" selected>Standard, verwitterter Asphalt (Albedo 0.12)</option>
+                    <option value="0.20">Moderner, grauer Belag (Albedo 0.20)</option>
+                    <option value="0.35">Spezial-Aufhellung / Cool Pavement (Albedo 0.35)</option>
+                </select>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="control-group">
+                    <label>
+                        Referenztemp.: <span class="slider-val" id="valTRef">25°C</span>
+                        <span class="has-tooltip">
+                            <span class="tooltip-icon">i</span>
+                            <span class="tooltip-text">Die ungestörte Lufttemperatur im ländlichen, unbebauten Umland (ohne städtischen Hitzeinseleffekt).</span>
+                        </span>
+                    </label>
+                    <input type="range" id="tRef" min="15" max="35" step="0.5" value="25">
+                </div>
+                <div class="control-group">
+                    <label>
+                        Hitzeinsel-Faktor: <span class="slider-val" id="valUHIMax">5°C</span>
+                        <span class="has-tooltip">
+                            <span class="tooltip-icon">i</span>
+                            <span class="tooltip-text">Der maximale Temperaturunterschied (UHI_max) an Hitzetagen zwischen dem überhitzten Stadtkern und dem Umland.</span>
+                        </span>
+                    </label>
+                    <input type="range" id="uhiMax" min="1" max="10" step="0.5" value="5">
+                </div>
+            </div>
+        </div>
+
+        <!-- RECHTES PANEL: ERGEBNISSE -->
+        <div class="panel">
+            <h2>Simulierte Mikroklima-Messwerte</h2>
+
+            <div class="metric-card" style="border-left-color: #2ecc71;">
+                <div class="metric-title">
+                    InVEST Cooling Capacity (Kühlleistung)
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Physikalischer Kühlungs-Index (0-100%). Errechnet aus 60% Baumschatten, 20% Albedo und 20% Evapotranspiration (Verdunstung) gemäss Stanford-Modell.</span>
+                    </span>
+                </div>
+                <div class="metric-value" id="resCC">-- %</div>
+                <div id="comfortBadge" class="comfort-badge">Mässig</div>
+            </div>
+
+            <div class="metric-card" style="border-left-color: #e74c3c;">
+                <div class="metric-title">
+                    Berechnete Lufttemperatur (T_air)
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Die resultierende Lufttemperatur im simulierten Stadtquartier, gemindert durch die lokale Kühlleistung der Natur.</span>
+                    </span>
+                </div>
+                <div class="metric-value" id="resAirTemp">-- °C</div>
+            </div>
+
+            <div class="metric-card" style="border-left-color: #e67e22;">
+                <div class="metric-title">
+                    Max. Oberflächentemperatur (Boden/Dach)
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Reale Erhitzung des Bodens bei direkter Sonneneinstrahlung. Unbeschatteter Asphalt erreicht laut umverkehR-Messungen in Zürich bis zu 58°C!</span>
+                    </span>
+                </div>
+                <div class="metric-value" id="resSurfTemp">-- °C</div>
+            </div>
+
+            <div class="metric-card" style="border-left-color: #3498db;">
+                <div class="metric-title">
+                    Temperatur-Ersparnis vs. Betonwüste
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Zeigt auf, wie viel kühler dieses Szenario im Vergleich zu einem komplett zuasphaltierten, baumlosen Quartier bleibt.</span>
+                    </span>
+                </div>
+                <div class="metric-value" id="resReduction">-- °C</div>
+            </div>
+
+            <div class="metric-card" style="border-left-color: #9b59b6;">
+                <div class="metric-title">
+                    Eingesparte AC-Energie (pro 100m² Grundfläche)
+                    <span class="has-tooltip">
+                        <span class="tooltip-icon">i</span>
+                        <span class="tooltip-text">Eingesparter Strombedarf für Raumklimatisierung. Kühlung senkt den Kühlaufwand für Gebäude um ca. 1.5 kWh/°C pro m² jährlich.</span>
+                    </span>
+                </div>
+                <div class="metric-value" id="resEnergy">-- kWh</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lade die neue v2 Engine aus dem Studio -->
+<script src="microclimate-engine-v2.js"></script>
+<script>
+
+const SWISS_CITY_PRESETS = {
+    carouge: {
+        name: "Carouge (GE)",
+        description: "Schweizweit am stärksten versiegelt (79%). Extreme Hitzeinsel.",
+        pctAsphalt: 55,
+        pctPorous: 5,
+        pctBuildings: 24,
+        pctGreen: 11,
+        pctTrees: 5,
+        pctGreenRoofs: 10,
+        asphaltAlbedo: 0.08,
+        uhiMax: 6.5
+    },
+    emmen: {
+        name: "Emmen (LU)",
+        description: "Spitzenreiter der Versiegelung in der Deutschschweiz (70%).",
+        pctAsphalt: 45,
+        pctPorous: 5,
+        pctBuildings: 20,
+        pctGreen: 20,
+        pctTrees: 10,
+        pctGreenRoofs: 5,
+        asphaltAlbedo: 0.12,
+        uhiMax: 5.5
+    },
+    zuerich: {
+        name: "Zürich (Zentrum)",
+        description: "Urbane Kernzone mit ca. 15.4% Baumkronenanteil.",
+        pctAsphalt: 40,
+        pctPorous: 10,
+        pctBuildings: 25,
+        pctGreen: 10,
+        pctTrees: 15,
+        pctGreenRoofs: 15,
+        asphaltAlbedo: 0.08,
+        uhiMax: 6.0
+    },
+    lausanne: {
+        name: "Lausanne (VD)",
+        description: "EPFL-Forschungsgebiet. Starkes Relief, mässige Begrünung.",
+        pctAsphalt: 35,
+        pctPorous: 10,
+        pctBuildings: 20,
+        pctGreen: 15,
+        pctTrees: 20,
+        pctGreenRoofs: 20,
+        asphaltAlbedo: 0.12,
+        uhiMax: 5.0
+    },
+    riehen: {
+        name: "Riehen (BS)",
+        description: "Grünste Grossgemeinde der Schweiz (nur 46% versiegelt).",
+        pctAsphalt: 25,
+        pctPorous: 15,
+        pctBuildings: 6,
+        pctGreen: 30,
+        pctTrees: 24,
+        pctGreenRoofs: 40,
+        asphaltAlbedo: 0.20,
+        uhiMax: 3.5
+    },
+    dorf: {
+        name: "Mittelland-Dorf (Kanton Bern)",
+        description: "Typische ländliche Struktur. Geringe Luftüberwärmung, aber lokale Hitze-Hotspots auf dem unbeschatteten Dorfplatz.",
+        pctAsphalt: 15,
+        pctPorous: 10,
+        pctBuildings: 8,
+        pctGreen: 45,
+        pctTrees: 22,
+        pctGreenRoofs: 5,
+        asphaltAlbedo: 0.12,
+        uhiMax: 1.5
+    },
+    renens: {
+        name: "Renens (VD)",
+        description: "Zweithöchste Versiegelung der Schweiz (73%). Extrem dichte Bebauung.",
+        pctAsphalt: 50,
+        pctPorous: 8,
+        pctBuildings: 23,
+        pctGreen: 12,
+        pctTrees: 7,
+        pctGreenRoofs: 10,
+        asphaltAlbedo: 0.08,
+        uhiMax: 6.2
+    },
+    genf: {
+        name: "Genf (GE)",
+        description: "Dicht bebaute Metropole mit 71% Versiegelungsgrad. Starke Hitzeinsel.",
+        pctAsphalt: 46,
+        pctPorous: 10,
+        pctBuildings: 25,
+        pctGreen: 11,
+        pctTrees: 8,
+        pctGreenRoofs: 15,
+        asphaltAlbedo: 0.08,
+        uhiMax: 6.0
+    },
+    vevey: {
+        name: "Vevey (VD)",
+        description: "Bekannt für extreme Tropennächte (nachts bis zu 24.7°C am Seeufer).",
+        pctAsphalt: 38,
+        pctPorous: 12,
+        pctBuildings: 20,
+        pctGreen: 15,
+        pctTrees: 15,
+        pctGreenRoofs: 20,
+        asphaltAlbedo: 0.12,
+        uhiMax: 5.8
+    }
+};
+
+document.getElementById('cityPreset').addEventListener('change', function(e) {
+    const key = e.target.value;
+    if (!key) {
+        document.getElementById('cityDesc').innerText = "";
+        return;
+    }
+    
+    const preset = SWISS_CITY_PRESETS[key];
+    document.getElementById('cityDesc').innerText = preset.description;
+
+    // Reglerwerte updaten
+    document.getElementById('pctAsphalt').value = preset.pctAsphalt;
+    document.getElementById('pctPorous').value = preset.pctPorous;
+    document.getElementById('pctBuildings').value = preset.pctBuildings;
+    document.getElementById('pctGreen').value = preset.pctGreen;
+    document.getElementById('pctTrees').value = preset.pctTrees;
+    document.getElementById('pctGreenRoofs').value = preset.pctGreenRoofs;
+    document.getElementById('asphaltAlbedo').value = preset.asphaltAlbedo;
+    document.getElementById('uhiMax').value = preset.uhiMax;
+
+    // Simulation neu berechnen
+    updateSimulation();
+});
+
+
+    const controls = ['pctAsphalt', 'pctPorous', 'pctBuildings', 'pctGreen', 'pctTrees', 'pctGreenRoofs', 'tRef', 'uhiMax', 'asphaltAlbedo'];
+
+    function updateSimulation() {
+        const inputs = {
+            pctAsphalt: parseFloat(document.getElementById('pctAsphalt').value),
+            pctPorous: parseFloat(document.getElementById('pctPorous').value),
+            pctBuildings: parseFloat(document.getElementById('pctBuildings').value),
+            pctGreen: parseFloat(document.getElementById('pctGreen').value),
+            pctTrees: parseFloat(document.getElementById('pctTrees').value),
+            pctGreenRoofs: parseFloat(document.getElementById('pctGreenRoofs').value),
+            asphaltAlbedo: parseFloat(document.getElementById('asphaltAlbedo').value)
+        };
+
+        const tRef = parseFloat(document.getElementById('tRef').value);
+        const uhiMax = parseFloat(document.getElementById('uhiMax').value);
+
+        // Update Slider Label-Texte
+        document.getElementById('valAsphalt').innerText = inputs.pctAsphalt + '%';
+        document.getElementById('valPorous').innerText = inputs.pctPorous + '%';
+        document.getElementById('valBuildings').innerText = inputs.pctBuildings + '%';
+        document.getElementById('valGreen').innerText = inputs.pctGreen + '%';
+        document.getElementById('valTrees').innerText = inputs.pctTrees + '%';
+        document.getElementById('valGreenRoofs').innerText = inputs.pctGreenRoofs + '%';
+        document.getElementById('valTRef').innerText = tRef.toFixed(1) + ' °C';
+        document.getElementById('valUHIMax').innerText = uhiMax.toFixed(1) + ' °C';
+
+        // Balkengrafik berechnen & visualisieren (Prozentual aufteilen)
+        const total = inputs.pctAsphalt + inputs.pctPorous + inputs.pctBuildings + inputs.pctGreen + inputs.pctTrees;
+        if (total > 0) {
+            document.getElementById('segAsphalt').style.width = (inputs.pctAsphalt / total * 100) + '%';
+            document.getElementById('segPorous').style.width = (inputs.pctPorous / total * 100) + '%';
+            document.getElementById('segBuildings').style.width = (inputs.pctBuildings / total * 100) + '%';
+            document.getElementById('segGreen').style.width = (inputs.pctGreen / total * 100) + '%';
+            document.getElementById('segTrees').style.width = (inputs.pctTrees / total * 100) + '%';
+        }
+
+        // Engine-Berechnung auslösen
+        const engine = new MicroclimateEngine({ t_ref: tRef, uhi_max: uhiMax });
+        const results = engine.simulate(inputs);
+
+        // UI-Messwerte updaten
+        document.getElementById('resCC').innerText = (results.metrics.coolingCapacity * 100).toFixed(1) + ' %';
+        document.getElementById('resAirTemp').innerText = results.metrics.airTemperature.toFixed(2) + ' °C';
+        document.getElementById('resSurfTemp').innerText = results.metrics.surfaceTemperature.toFixed(1) + ' °C';
+        document.getElementById('resReduction').innerText = results.metrics.tempReduction.toFixed(2) + ' °C';
+        document.getElementById('resEnergy').innerText = results.metrics.annualKwhSavingsPer100m2.toFixed(0) + ' kWh';
+
+        // Komfort Badge updaten
+        const badge = document.getElementById('comfortBadge');
+        badge.innerText = results.qualitative.comfortRating;
+        badge.style.backgroundColor = results.qualitative.comfortColor;
+    }
+
+    // Registriere Event-Listener
+    controls.forEach(id => {
+        document.getElementById(id).addEventListener('input', updateSimulation);
+        document.getElementById(id).addEventListener('change', updateSimulation);
+    });
+
+    window.onload = updateSimulation;
+</script>
+</body>
+</html>
