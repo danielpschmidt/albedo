@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kurzinfo | Mikroklima-Simulator Schweiz</title>
+<script src="theme.js"></script>
 <style>
     :root {
         --primary: #2c3e50;
@@ -11,6 +12,13 @@
         --bg: #f8f9fa;
         --card-bg: #ffffff;
         --text: #2c3e50;
+    }
+
+    :root[data-theme="dark"] {
+        --primary: #e2e8f0;
+        --bg: #0f172a;
+        --card-bg: #1e293b;
+        --text: #e2e8f0;
     }
 
     * { box-sizing: border-box; }
@@ -36,6 +44,8 @@
         max-width: 1100px;
         width: 100%;
         display: flex;
+        align-items: center;
+        flex-wrap: wrap;
         justify-content: center;
         gap: 10px;
         margin: 0 0 16px 0;
@@ -59,6 +69,58 @@
     .page-nav a:not(.active):hover {
         background: #dfe3e4;
     }
+    :root[data-theme="dark"] .page-nav a:not(.active) {
+        background: #1e293b;
+        color: #e2e8f0;
+    }
+    :root[data-theme="dark"] .page-nav a:not(.active):hover {
+        background: #334155;
+    }
+
+    /* --- Dark-Mode-Switch --- */
+    .theme-switch {
+        position: relative;
+        display: inline-block;
+        width: 46px;
+        height: 24px;
+        margin-left: auto;
+        flex-shrink: 0;
+    }
+    .theme-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .theme-switch-slider {
+        position: absolute;
+        inset: 0;
+        background: #cbd5e1;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: background 0.25s;
+    }
+    .theme-switch-slider::before {
+        content: '☀️';
+        position: absolute;
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        top: 3px;
+        border-radius: 50%;
+        background: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        transition: transform 0.25s;
+    }
+    .theme-switch input:checked + .theme-switch-slider {
+        background: #334155;
+    }
+    .theme-switch input:checked + .theme-switch-slider::before {
+        content: '🌙';
+        transform: translateX(22px);
+    }
 
     .card {
         background: var(--card-bg);
@@ -77,6 +139,12 @@
         text-align: center;
         color: #7f8c8d;
         margin: 0 0 24px 0;
+    }
+
+    :root[data-theme="dark"] .subtitle,
+    :root[data-theme="dark"] .source-note,
+    :root[data-theme="dark"] footer {
+        color: #94a3b8;
     }
 
     .infographic-wrap {
@@ -98,6 +166,12 @@
         margin-top: 16px;
         font-style: italic;
     }
+    footer {
+        text-align: center;
+        font-size: 0.78rem;
+        color: #7f8c8d;
+        margin-top: 16px;
+    }
 </style>
 </head>
 <body>
@@ -106,6 +180,10 @@
     <a href="index.html">🏙️ Simulator</a>
     <a href="day-cycle.html">🕐 Tagesverlauf &amp; Duell-Modus</a>
     <a href="kurzinfo.html" class="active">📊 Kurzinfo</a>
+    <label class="theme-switch" title="Dark Mode umschalten">
+        <input type="checkbox" id="themeToggle">
+        <span class="theme-switch-slider"></span>
+    </label>
 </nav>
 
 <div class="container">
@@ -118,6 +196,8 @@
         </div>
         <p class="source-note">Zusammenfassung der wichtigsten Kennzahlen zum städtischen Hitzeinsel-Effekt, die auch dem Simulator zugrunde liegen (InVEST Urban Cooling Model, BAFU/ETHZ-Daten).</p>
     </div>
+
+    <footer>Basierend auf dem InVEST Urban Cooling Model &middot; Kalibriert mit BAFU- und ETHZ-Daten</footer>
 </div>
 
 </body>

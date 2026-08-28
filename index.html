@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mikroklima & Hitzeinsel-Simulator Schweiz v3.0</title>
+    <script src="theme.js"></script>
     <style>
         :root {
             --primary: #2c3e50;
@@ -12,6 +13,14 @@
             --card-bg: #ffffff;
             --text: #2c3e50;
             --tooltip-bg: #2c3e50;
+        }
+
+        :root[data-theme="dark"] {
+            --primary: #e2e8f0;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #e2e8f0;
+            --tooltip-bg: #0f172a;
         }
 
         body {
@@ -65,6 +74,11 @@
             border-radius: 8px;
         }
 
+        :root[data-theme="dark"] .panel {
+            background: #16213a;
+            border-color: #334155;
+        }
+
         h2 {
             font-size: 1.2rem;
             border-bottom: 2px solid var(--accent);
@@ -85,6 +99,16 @@
         .control-group.special {
             border-left-color: #3498db;
             background: #f4f9fd;
+        }
+
+        :root[data-theme="dark"] .control-group {
+            background: #16213a;
+            border-left-color: #475569;
+        }
+
+        :root[data-theme="dark"] .control-group.special {
+            background: #132a3d;
+            border-left-color: #3498db;
         }
 
         /* Tooltip-Styling */
@@ -183,6 +207,10 @@
             position: relative;
         }
 
+        :root[data-theme="dark"] .metric-card {
+            background: #16213a;
+        }
+
         .metric-title {
             font-size: 0.85rem;
             text-transform: uppercase;
@@ -190,6 +218,18 @@
             font-weight: bold;
             display: flex;
             align-items: center;
+        }
+
+        :root[data-theme="dark"] .metric-title,
+        :root[data-theme="dark"] .subtitle,
+        :root[data-theme="dark"] footer {
+            color: #94a3b8;
+        }
+
+        :root[data-theme="dark"] select {
+            background: #334155;
+            color: #e2e8f0;
+            border-color: #475569;
         }
 
         .metric-value {
@@ -242,6 +282,8 @@
             max-width: 1100px;
             width: 100%;
             display: flex;
+            align-items: center;
+            flex-wrap: wrap;
             justify-content: center;
             gap: 10px;
             margin: 0 0 16px 0;
@@ -265,6 +307,64 @@
         .page-nav a:not(.active):hover {
             background: #dfe3e4;
         }
+        :root[data-theme="dark"] .page-nav a:not(.active) {
+            background: #1e293b;
+            color: #e2e8f0;
+        }
+        :root[data-theme="dark"] .page-nav a:not(.active):hover {
+            background: #334155;
+        }
+
+        /* --- Dark-Mode-Switch --- */
+        .theme-switch {
+            position: relative;
+            display: inline-block;
+            width: 46px;
+            height: 24px;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        .theme-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .theme-switch-slider {
+            position: absolute;
+            inset: 0;
+            background: #cbd5e1;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: background 0.25s;
+        }
+        .theme-switch-slider::before {
+            content: '☀️';
+            position: absolute;
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            top: 3px;
+            border-radius: 50%;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            transition: transform 0.25s;
+        }
+        .theme-switch input:checked + .theme-switch-slider {
+            background: #334155;
+        }
+        .theme-switch input:checked + .theme-switch-slider::before {
+            content: '🌙';
+            transform: translateX(22px);
+        }
+        footer {
+            text-align: center;
+            font-size: 0.78rem;
+            color: #7f8c8d;
+            margin-top: 16px;
+        }
     </style>
 </head>
 <body>
@@ -273,6 +373,10 @@
     <a href="index.html" class="active">🏙️ Simulator</a>
     <a href="day-cycle.html">🕐 Tagesverlauf &amp; Duell-Modus</a>
     <a href="kurzinfo.html">📊 Kurzinfo</a>
+    <label class="theme-switch" title="Dark Mode umschalten">
+        <input type="checkbox" id="themeToggle">
+        <span class="theme-switch-slider"></span>
+    </label>
 </nav>
 
 <div class="container">
@@ -485,6 +589,8 @@
             </div>
         </div>
     </div>
+
+    <footer>Basierend auf dem InVEST Urban Cooling Model &middot; Kalibriert mit BAFU- und ETHZ-Daten</footer>
 </div>
 
 <!-- Lade die neue v2 Engine aus dem Studio -->

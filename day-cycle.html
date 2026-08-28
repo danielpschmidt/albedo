@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tagesverlauf-Dashboard | Mikroklima-Simulator Schweiz</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="theme.js"></script>
 <style>
     :root {
         --card-bg: rgba(255,255,255,0.92);
@@ -14,6 +15,15 @@
         --tooltip-bg: #1e293b;
         --bg-a: #0f172a;
         --bg-b: #1e1b4b;
+    }
+
+    /* Die Tag/Nacht-Animation (--bg-a / --bg-b) bleibt in beiden Modi aktiv
+       und wird per JS gesteuert - nur die Karten/Text-Farben wechseln. */
+    :root[data-theme="dark"] {
+        --card-bg: rgba(30, 41, 59, 0.92);
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --tooltip-bg: #0f172a;
     }
 
     * { box-sizing: border-box; }
@@ -154,6 +164,11 @@
         padding: 6px 10px;
     }
 
+    :root[data-theme="dark"] #hourLabel {
+        background: #334155;
+        color: #e2e8f0;
+    }
+
     .chart-wrap { position: relative; height: 340px; }
 
     /* --- Metrik-Karten --- */
@@ -168,6 +183,10 @@
         border-left: 4px solid var(--accent);
         padding: 14px 16px;
         border-radius: 0 10px 10px 0;
+    }
+
+    :root[data-theme="dark"] .metric-card {
+        background: #111827;
     }
 
     .metric-title {
@@ -191,6 +210,8 @@
     /* --- Seitennavigation --- */
     .page-nav {
         display: flex;
+        align-items: center;
+        flex-wrap: wrap;
         justify-content: center;
         gap: 10px;
         margin: 0 0 18px 0;
@@ -215,6 +236,51 @@
         background: rgba(255,255,255,0.28);
     }
 
+    /* --- Dark-Mode-Switch --- */
+    .theme-switch {
+        position: relative;
+        display: inline-block;
+        width: 46px;
+        height: 24px;
+        margin-left: auto;
+        flex-shrink: 0;
+    }
+    .theme-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .theme-switch-slider {
+        position: absolute;
+        inset: 0;
+        background: rgba(255,255,255,0.3);
+        border-radius: 999px;
+        cursor: pointer;
+        transition: background 0.25s;
+    }
+    .theme-switch-slider::before {
+        content: '☀️';
+        position: absolute;
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        top: 3px;
+        border-radius: 50%;
+        background: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        transition: transform 0.25s;
+    }
+    .theme-switch input:checked + .theme-switch-slider {
+        background: #334155;
+    }
+    .theme-switch input:checked + .theme-switch-slider::before {
+        content: '🌙';
+        transform: translateX(22px);
+    }
+
     /* --- Duell-Modus --- */
     .duel-grid {
         display: grid;
@@ -233,6 +299,11 @@
     }
     .duel-panel.duel-a { border-left-color: #2563eb; background: #eff6ff; }
     .duel-panel.duel-b { border-left-color: #ea580c; background: #fff7ed; }
+
+    :root[data-theme="dark"] .duel-panel { background: #1e293b; }
+    :root[data-theme="dark"] .duel-panel.duel-a { background: #132a45; }
+    :root[data-theme="dark"] .duel-panel.duel-b { background: #3a2211; }
+    :root[data-theme="dark"] select { background: #334155; color: #e2e8f0; border-color: #475569; }
 
     .duel-panel h3 { margin: 0 0 10px 0; font-size: 1rem; }
 
@@ -279,6 +350,10 @@
     .duel-result-col.col-a { border-top: 3px solid #2563eb; }
     .duel-result-col.col-b { border-top: 3px solid #ea580c; }
 
+    :root[data-theme="dark"] .duel-result-col { background: #111827; }
+    :root[data-theme="dark"] .mini-metric { border-bottom-color: #334155; }
+    :root[data-theme="dark"] .mini-metric strong { color: #e2e8f0; }
+
     .duel-result-col h4 {
         margin: 0 0 8px 0;
         font-size: 0.8rem;
@@ -322,6 +397,10 @@
         <a href="index.html">🏙️ Simulator</a>
         <a href="day-cycle.html" class="active">🕐 Tagesverlauf &amp; Duell-Modus</a>
         <a href="kurzinfo.html">📊 Kurzinfo</a>
+        <label class="theme-switch" title="Dark Mode umschalten">
+            <input type="checkbox" id="themeToggle">
+            <span class="theme-switch-slider"></span>
+        </label>
     </nav>
 
     <header>
@@ -608,7 +687,7 @@
         </div>
     </div>
 
-    <footer>Basierend auf dem InVEST Urban Cooling Model &middot; Kalibriert mit BAFU- und ETHZ-Daten</footer>
+    <footer>Basierend auf dem InVEST Urban Cooling Model &middot; Kalibriert mit BAFU- und ETHZ-Daten<br>Version 1.4</footer>
 </div>
 
 <script src="microclimate-engine-v2.js"></script>
@@ -694,6 +773,10 @@
     }
 
     let dayData = [];
+
+    function getCurrentHour() {
+        return new Date().getHours();
+    }
 
     function recomputeDayCycle() {
         const inputs = readInputs();
@@ -855,7 +938,10 @@
         document.getElementById(id).addEventListener('change', recomputeDayCycle);
     });
 
-    window.addEventListener('load', recomputeDayCycle);
+    window.addEventListener('load', () => {
+        document.getElementById('hourSlider').value = getCurrentHour();
+        recomputeDayCycle();
+    });
 
     // =================================================================
     // DUELL-MODUS: ZWEI STANDORTE IM VERGLEICH
@@ -1077,6 +1163,30 @@
         plugins: [activeHourPlugin]
     });
 
+    // ---------------------------------------------------------------
+    // Chart-Farben an Dark/Light-Mode anpassen
+    // (Hintergrund-Animation bleibt davon unberührt)
+    // ---------------------------------------------------------------
+    function applyChartTheme() {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const textColor = isDark ? '#e2e8f0' : '#1e293b';
+        const gridColor = isDark ? 'rgba(226, 232, 240, 0.12)' : 'rgba(30, 41, 59, 0.08)';
+
+        [chart, duelChart].forEach(c => {
+            c.options.plugins.legend.labels.color = textColor;
+            c.options.scales.x.ticks.color = textColor;
+            c.options.scales.x.title.color = textColor;
+            c.options.scales.x.grid.color = gridColor;
+            c.options.scales.y.ticks.color = textColor;
+            c.options.scales.y.title.color = textColor;
+            c.options.scales.y.grid.color = gridColor;
+            c.update('none');
+        });
+    }
+
+    document.addEventListener('themechange', applyChartTheme);
+    window.addEventListener('load', applyChartTheme);
+
     function recomputeDuel() {
         const inputsA = readDuelInputs('A');
         const inputsB = readDuelInputs('B');
@@ -1188,6 +1298,7 @@
         applyDuelPreset('A', 'dense_city');
         applyDuelPreset('B', 'countryside');
 
+        document.getElementById('hourSliderDuel').value = getCurrentHour();
         recomputeDuel();
     });
 })();
